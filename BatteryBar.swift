@@ -294,7 +294,13 @@ final class IOSDeviceReader: ObservableObject {
     /// used to keep showing data when the USB connection drops briefly instead of the device "vanishing".
     private var lastGood: [IOSDeviceInfo] = []
     private var lastGoodAt: Date?
-    private static let staleGrace: TimeInterval = 90   // seconds
+    /// How long to keep showing the last reading after reads stop succeeding, before the device
+    /// disappears. Short when it drops out of USB enumeration entirely (usually a real unplug),
+    /// longer when it's still enumerated but the battery read fails (e.g. locked / another app holds
+    /// the lockdown session, which tends to recover on its own).
+    private static let staleGraceGone: TimeInterval = 5
+    private static let staleGraceUnreadable: TimeInterval = 30
+    private static let toolTimeout: TimeInterval = 4   // kill a libimobiledevice tool that overruns this
 
     private static let searchDirs = ["/opt/homebrew/bin/", "/usr/local/bin/", "/usr/bin/"]
 
@@ -358,7 +364,16 @@ final class IOSDeviceReader: ObservableObject {
             _ = errPipe.fileHandleForReading.readDataToEndOfFile()
             group.leave()
         }
-        group.wait()
+
+        // Bail out if the tool overruns: unplugging the device mid-read can leave
+        // idevicediagnostics/ideviceinfo blocked indefinitely, which would otherwise hang this
+        // reader thread (waitUntilExit never returns), wedge isBusy at true, and freeze the whole
+        // iOS section until relaunch.
+        if group.wait(timeout: .now() + Self.toolTimeout) == .timedOut {
+            process.terminate()
+            _ = group.wait(timeout: .now() + 1)   // let the pipe readers hit EOF and unwind
+            return nil
+        }
         process.waitUntilExit()
         return process.terminationStatus == 0 ? outData : nil
     }
@@ -457,11 +472,12 @@ final class IOSDeviceReader: ObservableObject {
             self.toolsMissing = false
 
             let now = Date()
-            let graceOK = self.lastGoodAt.map { now.timeIntervalSince($0) < Self.staleGrace } ?? false
+            let sinceGood = self.lastGoodAt.map { now.timeIntervalSince($0) } ?? .infinity
 
-            // Empty enumeration (flaky connection) → keep the device we just saw if still within the grace period.
+            // Empty enumeration → device is off the USB bus. Ride out a brief blip, then let it go:
+            // a deliberate unplug should clear within a few seconds, not linger.
             if fresh.isEmpty {
-                if graceOK, !self.lastGood.isEmpty {
+                if sinceGood < Self.staleGraceGone, !self.lastGood.isEmpty {
                     self.devices = self.lastGood.map { var d = $0; d.isStale = true; return d }
                     self.statusMessage = nil
                 } else {
@@ -472,25 +488,28 @@ final class IOSDeviceReader: ObservableObject {
                 return
             }
 
-            // Enumeration succeeded: any device whose diagnostics read failed reuses the last good data.
+            // Enumeration succeeded: a device whose battery read failed briefly reuses the last good
+            // data; genuinely fresh reads are shown as-is.
             var merged: [IOSDeviceInfo] = []
+            var freshGood: [IOSDeviceInfo] = []
             for dev in fresh {
-                if dev.errorMessage != nil, graceOK,
+                if dev.errorMessage != nil, sinceGood < Self.staleGraceUnreadable,
                    let prev = self.lastGood.first(where: { $0.id == dev.id }) {
                     var s = prev; s.isStale = true
                     merged.append(s)
                 } else {
                     merged.append(dev)
+                    if dev.errorMessage == nil { freshGood.append(dev) }
                 }
             }
             self.devices = merged
             self.statusMessage = nil
 
-            // Update the cache with devices that currently have good data (including reused ones).
-            let good = merged.filter { $0.errorMessage == nil }
-                .map { var d = $0; d.isStale = false; return d }
-            if !good.isEmpty {
-                self.lastGood = good
+            // Only genuinely fresh reads refresh the grace window. Reused stale entries also carry
+            // errorMessage == nil, so counting them would keep resetting the timer and the device
+            // would never time out while it stays enumerated-but-unreadable.
+            if !freshGood.isEmpty {
+                self.lastGood = freshGood
                 self.lastGoodAt = now
             }
         }
