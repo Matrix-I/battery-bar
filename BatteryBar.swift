@@ -555,38 +555,45 @@ func batteryMenuBarImage(level: Double, charging: Bool, percent: Int? = nil) -> 
     let h: CGFloat = 13
     let lw: CGFloat = 1.2
 
-    // --- Number-inside style: the % sits inside the battery body, so there's no
-    // separate label and therefore no left/right ordering to get wrong. Width grows
-    // to fit 1–3 digits (plus a bolt when charging). ---
+    // --- Number-left style: the % is drawn as a label to the LEFT of the battery
+    // glyph, and the glyph itself uses the proportional fill (same as the hidden-%
+    // fill style). Total width = label + gap + battery body + terminal nub. ---
     if let percent {
-        let text = "\(percent)" as NSString
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .semibold)
+        let text = "\(percent)%" as NSString
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold)
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
         let textSize = text.size(withAttributes: attrs)
-        let boltW: CGFloat = charging ? 5 : 0
-        let padX: CGFloat = 2.8
-        let bodyW = padX + boltW + ceil(textSize.width) + padX
-        let w = bodyW + 3.6
+        let labelW = ceil(textSize.width)
+        let gap: CGFloat = 3
+        let bodyW: CGFloat = 21.4                 // battery body width (glyph only)
+        let w = labelW + gap + bodyW + 3.6        // + terminal nub
 
         let img = NSImage(size: NSSize(width: w, height: h), flipped: false) { _ in
-            let bodyRect = NSRect(x: lw / 2, y: lw / 2, width: bodyW, height: h - lw)
+            // Percentage label on the left, vertically centred.
+            text.draw(at: NSPoint(x: 0, y: (h - textSize.height) / 2 + 0.3), withAttributes: attrs)
+
+            // Battery glyph to the right of the label.
+            let bx = labelW + gap
+            let bodyRect = NSRect(x: bx + lw / 2, y: lw / 2, width: bodyW, height: h - lw)
             NSColor.black.setStroke()
             let outline = NSBezierPath(roundedRect: bodyRect, xRadius: 3.4, yRadius: 3.4)
             outline.lineWidth = lw
             outline.stroke()
+
+            let inner = bodyRect.insetBy(dx: lw + 0.7, dy: lw + 0.7)
+            let fillW = max(1.5, inner.width * min(max(level, 0), 1))
             NSColor.black.setFill()
-            NSBezierPath(roundedRect: NSRect(x: bodyW + 0.6, y: h / 2 - 2.4, width: 1.7, height: 4.8),
+            NSBezierPath(roundedRect: NSRect(x: inner.minX, y: inner.minY, width: fillW, height: inner.height),
+                         xRadius: 1.6, yRadius: 1.6).fill()
+
+            NSBezierPath(roundedRect: NSRect(x: bx + bodyW + 0.6, y: h / 2 - 2.4, width: 1.7, height: 4.8),
                          xRadius: 0.8, yRadius: 0.8).fill()
 
-            var textX = bodyRect.minX + padX
             if charging, let bolt = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) {
-                let bh = h - 4.5, bw = bh * (bolt.size.width / max(bolt.size.height, 1))
-                bolt.draw(in: NSRect(x: bodyRect.minX + 1.6, y: h / 2 - bh / 2, width: bw, height: bh),
-                          from: .zero, operation: .sourceOver, fraction: 1)
-                textX = bodyRect.minX + 1.6 + bw + 0.8
+                let bh = h * 0.92, bw = bh * (bolt.size.width / max(bolt.size.height, 1))
+                let br = NSRect(x: bodyRect.midX - bw / 2, y: h / 2 - bh / 2, width: bw, height: bh)
+                bolt.draw(in: br, from: .zero, operation: .destinationOut, fraction: 1)
             }
-            // Vertically centre the digits (nudge for the font's internal leading).
-            text.draw(at: NSPoint(x: textX, y: (h - textSize.height) / 2 + 0.3), withAttributes: attrs)
             return true
         }
         img.isTemplate = true
