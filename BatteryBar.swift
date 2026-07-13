@@ -377,17 +377,6 @@ func healthColor(_ p: Double) -> Color {
     p >= 80 ? .green : (p >= 60 ? .orange : .red)
 }
 
-func batterySymbol(percent: Int, charging: Bool) -> String {
-    if charging { return "battery.100percent.bolt" }
-    switch percent {
-    case 88...: return "battery.100percent"
-    case 63...: return "battery.75percent"
-    case 38...: return "battery.50percent"
-    case 13...: return "battery.25percent"
-    default:    return "battery.0percent"
-    }
-}
-
 func fmtMinutes(_ m: Int) -> String { "\(m / 60)h \(String(format: "%02d", m % 60))m" }
 
 // MARK: - Views
@@ -406,6 +395,56 @@ struct BarView: View {
             }
         }
         .frame(height: 8)
+    }
+}
+
+/// Menu-bar battery glyph drawn like the native macOS one: horizontal outline +
+/// terminal nub, an inner fill proportional to the actual charge level, and a bolt
+/// (with a contrast halo so it stays visible at any fill) when charging. SF Symbols
+/// only ship `.bolt` for the 100% variant, so drawing it ourselves is the only way
+/// to show a charging battery that isn't stuck looking full.
+struct BatteryGlyph: View {
+    let level: Double        // 0…1
+    let charging: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            let lw = h * 0.10
+            let bodyW = w - h * 0.34            // room for the terminal nub
+            let inset = lw + h * 0.06
+            let innerMaxW = bodyW - inset * 2
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: h * 0.30)
+                    .stroke(.primary, lineWidth: lw)
+                    .frame(width: bodyW, height: h)
+                RoundedRectangle(cornerRadius: h * 0.16)
+                    .fill(.primary)
+                    .frame(width: max(1.5, innerMaxW * min(max(level, 0), 1)),
+                           height: h - inset * 2)
+                    .padding(.leading, inset)
+                RoundedRectangle(cornerRadius: h * 0.12)
+                    .fill(.primary)
+                    .frame(width: h * 0.12, height: h * 0.38)
+                    .offset(x: bodyW + h * 0.02, y: h * 0.31)
+                if charging {
+                    // Punch a bolt-shaped transparent gap through the outline+fill, then draw
+                    // the bolt back in the center. Uses only .primary + alpha, so it stays
+                    // visible on both filled and empty areas and adapts to light/dark menu bars.
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: h * 0.74, weight: .black))
+                        .foregroundStyle(.primary)
+                        .blendMode(.destinationOut)
+                        .frame(width: bodyW, height: h)
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: h * 0.50, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .frame(width: bodyW, height: h)
+                }
+            }
+            .compositingGroup()
+        }
+        .frame(width: 24, height: 12)
     }
 }
 
@@ -532,6 +571,8 @@ struct IOSDevicesSection: View {
 struct BatteryDetailView: View {
     @ObservedObject var reader: BatteryReader
     @ObservedObject var iosReader: IOSDeviceReader
+    @AppStorage("showMenuBarPercent") private var showMenuBarPercent = false
+    @AppStorage("showIPhoneMenuBar") private var showIPhoneMenuBar = false
 
     var body: some View {
         let i = reader.info
@@ -604,6 +645,16 @@ struct BatteryDetailView: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Show % in menu bar", isOn: $showMenuBarPercent)
+                Toggle("Show iPhone in menu bar", isOn: $showIPhoneMenuBar)
+            }
+            .font(.caption)
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
+            Divider()
+
             HStack {
                 Button("Refresh") {
                     reader.refresh()
@@ -644,15 +695,48 @@ struct BatteryDetailView: View {
     }
 }
 
+/// Single menu bar item. Mac-only: one line, battery-shape icon (+ optional %).
+/// With "Show iPhone in menu bar" on and a device readable: two compact stacked
+/// lines instead — laptop/iphone glyphs so the two percentages aren't ambiguous.
 struct MenuBarLabel: View {
     @ObservedObject var reader: BatteryReader
+    @ObservedObject var iosReader: IOSDeviceReader
+    @AppStorage("showMenuBarPercent") private var showMacPercent = false
+    @AppStorage("showIPhoneMenuBar") private var showIPhoneMenuBar = false
+
+    private var iosDevice: IOSDeviceInfo? {
+        guard showIPhoneMenuBar,
+              let device = iosReader.devices.first,
+              device.chargePercent != nil else { return nil }
+        return device
+    }
 
     var body: some View {
-        let pct = Int(reader.info.chargePercent.rounded())
-        HStack(spacing: 3) {
-            Image(systemName: batterySymbol(percent: pct,
-                                            charging: reader.info.isCharging))
-            Text("\(pct)%").monospacedDigit()
+        let macPct = Int(reader.info.chargePercent.rounded())
+
+        if let ios = iosDevice, let iosCp = ios.chargePercent {
+            let iosPct = Int(iosCp.rounded())
+            VStack(alignment: .trailing, spacing: 1) {
+                HStack(spacing: 2) {
+                    Text("\(macPct)%").monospacedDigit()
+                    Image(systemName: "laptopcomputer")
+                    if reader.info.isCharging { Image(systemName: "bolt.fill") }
+                }
+                HStack(spacing: 2) {
+                    Text("\(iosPct)%").monospacedDigit()
+                    Image(systemName: "iphone")
+                    if ios.isCharging { Image(systemName: "bolt.fill") }
+                }
+            }
+            .font(.system(size: 9, weight: .medium))
+        } else {
+            HStack(spacing: 4) {
+                if showMacPercent {
+                    Text("\(macPct)%").monospacedDigit()
+                }
+                BatteryGlyph(level: reader.info.chargePercent / 100,
+                             charging: reader.info.isCharging)
+            }
         }
     }
 }
@@ -676,7 +760,7 @@ struct BatteryBarApp: App {
         MenuBarExtra {
             BatteryDetailView(reader: reader, iosReader: iosReader)
         } label: {
-            MenuBarLabel(reader: reader)
+            MenuBarLabel(reader: reader, iosReader: iosReader)
         }
         .menuBarExtraStyle(.window)
     }

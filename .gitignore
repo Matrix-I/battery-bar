@@ -3,3 +3,6 @@ BatteryBar
 __pycache__/
 *.pyc
 .claude/
+AppIcon.iconset/
+AppIcon_1024.png
+icon_gen
