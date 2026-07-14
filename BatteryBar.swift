@@ -643,10 +643,10 @@ struct BatteryGlyph: View {
 /// Mac + iPhone in one menu-bar item: laptop glyph + Mac battery, then iPhone glyph +
 /// iPhone battery, all composited into a SINGLE template image. Baking it avoids the
 /// HStack reordering the real MenuBarExtra applies to multi-view labels.
-func dualMenuBarImage(macPct: Int, macCharging: Bool, iosPct: Int, iosCharging: Bool) -> NSImage {
+func dualMenuBarImage(macPct: Int, macCharging: Bool, iosPct: Int, iosCharging: Bool, showPercent: Bool) -> NSImage {
     let h: CGFloat = 13, symH: CGFloat = 10
-    let macBat = batteryMenuBarImage(level: Double(macPct) / 100, charging: macCharging, percent: macPct)
-    let iosBat = batteryMenuBarImage(level: Double(iosPct) / 100, charging: iosCharging, percent: iosPct)
+    let macBat = batteryMenuBarImage(level: Double(macPct) / 100, charging: macCharging, percent: showPercent ? macPct : nil)
+    let iosBat = batteryMenuBarImage(level: Double(iosPct) / 100, charging: iosCharging, percent: showPercent ? iosPct : nil)
     func symbol(_ name: String) -> NSImage? {
         guard let s = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return nil }
         s.isTemplate = true
@@ -1027,7 +1027,8 @@ struct MenuBarLabel: View {
             Image(nsImage: dualMenuBarImage(macPct: macPct,
                                             macCharging: reader.info.isCharging,
                                             iosPct: Int(iosCp.rounded()),
-                                            iosCharging: ios.isCharging))
+                                            iosCharging: ios.isCharging,
+                                            showPercent: showMacPercent))
         } else {
             // Number lives inside the battery, so there's just one element — no HStack
             // ordering for the menu bar to reverse.
