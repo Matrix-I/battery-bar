@@ -1043,6 +1043,7 @@ struct InfoRow: View {
 
 struct IOSDeviceRow: View {
     let device: IOSDeviceInfo
+    @State private var showFullDetails = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -1095,22 +1096,47 @@ struct IOSDeviceRow: View {
                 if let cc = device.cycleCount {
                     InfoRow(label: "Cycle count", value: "\(cc)")
                 }
-                if let t = device.temperatureC {
-                    InfoRow(label: "Temperature", value: String(format: "%.1f °C", t))
+
+                ZStack {
+                    Divider()
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                showFullDetails.toggle()
+                            }
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
+                                .padding(4)
+                                .background(
+                                    Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help(showFullDetails ? "Show less" : "Show more")
+                    }
                 }
-                if let v = device.voltageV {
-                    InfoRow(label: "Voltage", value: String(format: "%.2f V", v))
-                }
-                if device.isCharging, let w = device.watts, w > 0.05 {
-                    InfoRow(label: "Charging with", value: String(format: "%.1f W", w))
-                }
-                if device.externalConnected {
-                    InfoRow(label: "Status",
-                            value: device.isCharging ? "Charging"
-                                : (device.fullyCharged ? "Fully charged" : "Plugged in, not charging"))
-                }
-                if !device.serial.isEmpty {
-                    InfoRow(label: "Serial", value: device.serial)
+
+                if showFullDetails {
+                    if let t = device.temperatureC {
+                        InfoRow(label: "Temperature", value: String(format: "%.1f °C", t))
+                    }
+                    if let v = device.voltageV {
+                        InfoRow(label: "Voltage", value: String(format: "%.2f V", v))
+                    }
+                    if device.isCharging, let w = device.watts, w > 0.05 {
+                        InfoRow(label: "Charging with", value: String(format: "%.1f W", w))
+                    }
+                    if device.externalConnected {
+                        InfoRow(label: "Status",
+                                value: device.isCharging ? "Charging"
+                                    : (device.fullyCharged ? "Fully charged" : "Plugged in, not charging"))
+                    }
+                    if !device.serial.isEmpty {
+                        InfoRow(label: "Serial", value: device.serial)
+                    }
                 }
             }
         }
@@ -1155,6 +1181,7 @@ struct IOSDevicesSection: View {
 
 struct AndroidDeviceRow: View {
     let device: AndroidDeviceInfo
+    @State private var showFullDetails = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -1204,28 +1231,53 @@ struct AndroidDeviceRow: View {
                 if let cc = device.cycleCount {
                     InfoRow(label: "Cycle count", value: "\(cc)")
                 }
-                if let health = device.healthText {
-                    InfoRow(label: "Health status", value: health)
+
+                ZStack {
+                    Divider()
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                showFullDetails.toggle()
+                            }
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
+                                .padding(4)
+                                .background(
+                                    Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help(showFullDetails ? "Show less" : "Show more")
+                    }
                 }
-                if let t = device.temperatureC {
-                    InfoRow(label: "Temperature", value: String(format: "%.1f °C", t))
-                }
-                if let v = device.voltageV {
-                    InfoRow(label: "Voltage", value: String(format: "%.2f V", v))
-                }
-                if !device.technology.isEmpty {
-                    InfoRow(label: "Technology", value: device.technology)
-                }
-                if device.isCharging, let w = device.maxChargingWatts {
-                    InfoRow(label: "Max charging power", value: String(format: "%.1f W", w))
-                }
-                if device.externalConnected {
-                    InfoRow(label: "Status",
-                            value: device.isCharging ? "Charging"
-                                : (device.fullyCharged ? "Fully charged" : "Plugged in, not charging"))
-                }
-                if !device.serial.isEmpty {
-                    InfoRow(label: "Serial", value: device.serial)
+
+                if showFullDetails {
+                    if let health = device.healthText {
+                        InfoRow(label: "Health status", value: health)
+                    }
+                    if let t = device.temperatureC {
+                        InfoRow(label: "Temperature", value: String(format: "%.1f °C", t))
+                    }
+                    if let v = device.voltageV {
+                        InfoRow(label: "Voltage", value: String(format: "%.2f V", v))
+                    }
+                    if !device.technology.isEmpty {
+                        InfoRow(label: "Technology", value: device.technology)
+                    }
+                    if device.isCharging, let w = device.maxChargingWatts {
+                        InfoRow(label: "Max charging power", value: String(format: "%.1f W", w))
+                    }
+                    if device.externalConnected {
+                        InfoRow(label: "Status",
+                                value: device.isCharging ? "Charging"
+                                    : (device.fullyCharged ? "Fully charged" : "Plugged in, not charging"))
+                    }
+                    if !device.serial.isEmpty {
+                        InfoRow(label: "Serial", value: device.serial)
+                    }
                 }
             }
         }
@@ -1313,6 +1365,16 @@ struct WindowVisibilityReporter: NSViewRepresentable {
     func updateNSView(_ nsView: WindowVisibilityView, context: Context) { nsView.onChange = onChange }
 }
 
+/// Reports the true (unclipped) height of the ScrollView's content, so the popover can be sized
+/// to `min(content height, cap)` instead of relying on ScrollView's own ideal size — which SwiftUI
+/// reports as ~0 in an auto-sizing container like MenuBarExtra(.window), making the window vanish.
+private struct PanelHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct BatteryDetailView: View {
     @ObservedObject var reader: BatteryReader
     @ObservedObject var iosReader: IOSDeviceReader
@@ -1321,7 +1383,43 @@ struct BatteryDetailView: View {
     @AppStorage("showIPhoneMenuBar") private var showIPhoneMenuBar = false
     @AppStorage("showAndroidMenuBar") private var showAndroidMenuBar = false
 
+    // Caps the popover so it never grows past 80% of the screen it's shown on — beyond that,
+    // the content scrolls instead of pushing the window further down.
+    private static var maxPanelHeight: CGFloat {
+        (NSScreen.main?.visibleFrame.height ?? 800) * 0.8
+    }
+    @AppStorage("showMacFullDetails") private var showMacFullDetails = false
+    // Starts pinned to the cap so the very first layout pass is never 0pt tall (which made the
+    // popover invisible) — GeometryReader below then corrects it down to the content's real size.
+    @State private var measuredContentHeight: CGFloat = Self.maxPanelHeight
+    @AppStorage("showMacPowerLiveDetails") private var showMacPowerLiveDetails = false
+
     var body: some View {
+        // Render un-scrolled by default (identical to the plain auto-sizing VStack this used to
+        // be) so the very first layout pass always has a well-defined size and the popover shows.
+        // Only once we've actually measured content taller than the cap do we switch to a
+        // ScrollView with a concrete fixed height — never an ambiguous/ideal-only constraint,
+        // which is what made the window vanish before.
+        Group {
+            if measuredContentHeight > Self.maxPanelHeight {
+                ScrollView { panelContent }
+                    .frame(height: Self.maxPanelHeight)
+            } else {
+                panelContent
+            }
+        }
+        .frame(width: 300)
+        .background(WindowVisibilityReporter { open in
+            reader.setPanelOpen(open)
+            if open {
+                iosReader.refresh()      // one immediate read on open; it stays on its slow cadence
+                androidReader.refresh()
+            }
+        })
+    }
+
+    @ViewBuilder
+    private var panelContent: some View {
         let i = reader.info
         VStack(alignment: .leading, spacing: 12) {
 
@@ -1366,39 +1464,83 @@ struct BatteryDetailView: View {
                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
 
-            Divider()
+            ZStack {
+                Divider()
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showMacFullDetails.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(showMacFullDetails ? Color.white : Color.secondary)
+                            .padding(4)
+                            .background(
+                                Circle().fill(showMacFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(showMacFullDetails ? "Show less" : "Show more")
+                }
+            }
 
             VStack(spacing: 6) {
                 InfoRow(label: "Full charge capacity", value: "\(i.maxCapacity) mAh")
                 InfoRow(label: "Design capacity", value: "\(i.designCapacity) mAh")
                 InfoRow(label: "Cycle count", value: "\(i.cycleCount)")
-                InfoRow(label: "Temperature",
-                        value: String(format: "%.1f °C", i.temperatureC))
-                InfoRow(label: "Voltage",
-                        value: String(format: "%.2f V", i.voltageV))
-                InfoRow(label: "Power", value: powerText(i))
-                if i.externalConnected && i.adapterWatts > 0 {
-                    InfoRow(label: "Adapter",
-                            value: "\(i.adapterWatts) W \(i.adapterName)")
-                }
-                InfoRow(label: "Status", value: statusText(i))
-                if !i.serial.isEmpty {
-                    InfoRow(label: "Serial", value: i.serial)
+                if showMacFullDetails {
+                    InfoRow(label: "Temperature",
+                            value: String(format: "%.1f °C", i.temperatureC))
+                    InfoRow(label: "Voltage",
+                            value: String(format: "%.2f V", i.voltageV))
+                    InfoRow(label: "Power", value: powerText(i))
+                    if i.externalConnected && i.adapterWatts > 0 {
+                        InfoRow(label: "Adapter",
+                                value: "\(i.adapterWatts) W \(i.adapterName)")
+                    }
+                    InfoRow(label: "Status", value: statusText(i))
+                    if !i.serial.isEmpty {
+                        InfoRow(label: "Serial", value: i.serial)
+                    }
                 }
             }
 
             // ⚡ Live power rails from the SMC — these tick every second, unlike the
             // battery-gauge values above (which the OS only refreshes every ~30–60 s).
             if i.smcSystemTotalW != nil || i.smcDCInW != nil {
-                Divider()
+                ZStack {
+                    Divider()
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                showMacPowerLiveDetails.toggle()
+                            }
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(showMacPowerLiveDetails ? Color.white : Color.secondary)
+                                .padding(4)
+                                .background(
+                                    Circle().fill(showMacPowerLiveDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help(showMacPowerLiveDetails ? "Show less" : "Show more")
+                    }
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("⚡ Power (live)").font(.caption).foregroundStyle(.secondary)
                     if let v = i.smcSystemTotalW { InfoRow(label: "System Total", value: String(format: "%.2f W", v)) }
-                    if let v = i.smcDCInW, v > 0.05 { InfoRow(label: "DC In", value: String(format: "%.2f W", v)) }
-                    if let v = i.smcBrightnessW, v > 0.05 { InfoRow(label: "Display", value: String(format: "%.2f W", v)) }
-                    if let v = i.smcThunderboltLW { InfoRow(label: "Thunderbolt L", value: String(format: "%.2f W", v)) }
-                    if let v = i.smcThunderboltRW { InfoRow(label: "Thunderbolt R", value: String(format: "%.2f W", v)) }
-                    if let v = i.smcPPBRW { InfoRow(label: "PPBR", value: String(format: "%.2f W", v)) }
+                    if showMacPowerLiveDetails {
+                        if let v = i.smcDCInW, v > 0.05 { InfoRow(label: "DC In", value: String(format: "%.2f W", v)) }
+                        if let v = i.smcBrightnessW, v > 0.05 { InfoRow(label: "Display", value: String(format: "%.2f W", v)) }
+                        if let v = i.smcThunderboltLW { InfoRow(label: "Thunderbolt L", value: String(format: "%.2f W", v)) }
+                        if let v = i.smcThunderboltRW { InfoRow(label: "Thunderbolt R", value: String(format: "%.2f W", v)) }
+                        if let v = i.smcPPBRW { InfoRow(label: "PPBR", value: String(format: "%.2f W", v)) }
+                    }
                 }
             }
 
@@ -1437,14 +1579,13 @@ struct BatteryDetailView: View {
             .controlSize(.small)
         }
         .padding(14)
-        .frame(width: 300)
-        .background(WindowVisibilityReporter { open in
-            reader.setPanelOpen(open)
-            if open {
-                iosReader.refresh()      // one immediate read on open; it stays on its slow cadence
-                androidReader.refresh()
+        .fixedSize(horizontal: false, vertical: true)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: PanelHeightPreferenceKey.self, value: proxy.size.height)
             }
-        })
+        )
+        .onPreferenceChange(PanelHeightPreferenceKey.self) { measuredContentHeight = $0 }
     }
 
     private func powerText(_ i: BatteryInfo) -> String {
