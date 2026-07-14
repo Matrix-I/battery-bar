@@ -44,6 +44,10 @@ struct BatteryInfo {
     var smcThunderboltRW: Double? = nil  // PU2R
     var smcPPBRW: Double? = nil          // PPBR
 
+    // Live fan speeds in RPM (SMC F<n>Ac keys, ~1 Hz). Empty on fanless Macs (e.g. MacBook Air) or
+    // when SMC is unavailable.
+    var fans: [Double] = []
+
     var chargePercent: Double {
         maxCapacity > 0 ? Double(currentCapacity) / Double(maxCapacity) * 100 : 0
     }
@@ -140,6 +144,9 @@ final class BatteryReader: ObservableObject {
         i.smcThunderboltLW = smc.readFloat("PU1R")
         i.smcThunderboltRW = smc.readFloat("PU2R")
         i.smcPPBRW         = smc.readFloat("PPBR")
+
+        // Live fan speeds — same SMC user client, also ~1 Hz.
+        i.fans = smc.readFans()
 
         let snapshot = i
         DispatchQueue.main.async { self.info = snapshot }
@@ -245,6 +252,20 @@ final class SMC {
                 | (UInt32(readOut.bytes.2) << 16)
                 | (UInt32(readOut.bytes.3) << 24)
         return Double(Float(bitPattern: raw))
+    }
+
+    /// Reads the actual RPM of every fan the SMC exposes. Fan keys are contiguous (F0Ac, F1Ac, …),
+    /// so it probes upward and stops at the first missing key — no separate `FNum` read needed, and
+    /// it works for any fan count. Returns [] on a fanless Mac or when SMC is unavailable. On Apple
+    /// Silicon each F<n>Ac is a `flt ` in RPM, which `readFloat` already handles.
+    func readFans() -> [Double] {
+        guard isAvailable else { return [] }
+        var fans: [Double] = []
+        for n in 0..<10 {                                 // 10 is a generous ceiling; no Mac has this many
+            guard let rpm = readFloat("F\(n)Ac") else { break }
+            fans.append(rpm)
+        }
+        return fans
     }
 }
 
@@ -1477,6 +1498,20 @@ struct BatteryDetailView: View {
     private var panelContent: some View {
         let i = reader.info
         VStack(alignment: .leading, spacing: 12) {
+
+            // 🌀 Fan speeds from the SMC (live, ~1 Hz) — pinned above the battery readout.
+            // Skipped entirely on fanless Macs (e.g. MacBook Air), so the battery header stays first there.
+            if !i.fans.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("🌀 Fans (live)").font(.caption).foregroundStyle(.secondary)
+                    ForEach(Array(i.fans.enumerated()), id: \.offset) { idx, rpm in
+                        InfoRow(label: i.fans.count > 1 ? "Fan \(idx + 1)" : "Fan",
+                                value: "\(Int(rpm.rounded())) rpm")
+                    }
+                }
+
+                Divider()
+            }
 
             // Header
             HStack {

@@ -8,3 +8,4 @@ __pycache__/
 AppIcon.iconset/
 AppIcon_1024.png
 icon_gen
+.DS_Store
