@@ -46,6 +46,13 @@ cat > "$APP.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>LSMinimumSystemVersion</key>   <string>13.0</string>
     <key>LSUIElement</key>              <true/>
+    <!-- The Network item reads the Wi-Fi network name (SSID), which macOS 14+ only reveals to apps
+         holding Location Services authorization. Both keys are provided so the prompt shows on old
+         and new systems; nothing else in the app uses location. -->
+    <key>NSLocationUsageDescription</key>
+    <string>BatteryBar shows the name of the Wi-Fi network you're connected to.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>BatteryBar shows the name of the Wi-Fi network you're connected to.</string>
 </dict>
 </plist>
 PLIST

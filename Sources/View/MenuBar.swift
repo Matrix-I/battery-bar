@@ -1,6 +1,6 @@
-// MenuBar.swift — everything that renders in the menu bar itself: the custom battery glyph
-// (drawn as a template NSImage), the dual Mac+phone glyph, and the MenuBarLabel view that
-// picks which of them to show.
+// MenuBar.swift — the images that render in the menu bar itself: the custom battery glyph (drawn as
+// a template NSImage), the dual Mac+phone glyph, and the coloured up/down network-rate glyph.
+// AppDelegate picks which battery image to show and assigns these to the status-item buttons.
 
 import SwiftUI
 import AppKit
@@ -99,14 +99,57 @@ func batteryMenuBarImage(level: Double, charging: Bool, percent: Int? = nil) -> 
     return img
 }
 
-/// Thin SwiftUI wrapper around the template battery image.
-struct BatteryGlyph: View {
-    let level: Double        // 0…1
-    let charging: Bool
-    var percent: Int? = nil  // when set, the number is drawn inside the battery
-    var body: some View {
-        Image(nsImage: batteryMenuBarImage(level: level, charging: charging, percent: percent))
+/// Compact up/down transfer rate for the menu bar: "↑ 1.2 MB/s" over "↓ 3.4 MB/s", baked into a
+/// single NSImage (right-aligned, two lines). Baking it — rather than a SwiftUI VStack — gives a
+/// compact, predictable two-line layout; the width tracks the wider of the two lines so it doesn't
+/// jump around as the rate changes.
+///
+/// The up arrow is red and the down arrow blue, matching the Total upload / download markers in the
+/// popover. A coloured menu-bar image can't be a template (templates render monochrome), so the
+/// system won't auto-tint it — the rate text is instead drawn in a colour picked from the current
+/// appearance (white in dark mode, black in light). The image is rebuilt ~1 Hz, so it re-adapts
+/// shortly after a light/dark switch.
+func networkMenuBarImage(up: Double, down: Double) -> NSImage {
+    let font = NSFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .regular)
+    let isDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    let textColor: NSColor = isDark ? .white : .black
+
+    // One line = a coloured arrow run followed by the rate in the adaptive text colour.
+    func line(arrow: String, arrowColor: NSColor, rate: String) -> NSAttributedString {
+        let s = NSMutableAttributedString(string: "\(arrow) ",
+                                          attributes: [.font: font, .foregroundColor: arrowColor])
+        s.append(NSAttributedString(string: rate, attributes: [.font: font, .foregroundColor: textColor]))
+        return s
     }
+
+    let upLine = line(arrow: "↑", arrowColor: .systemRed, rate: menuBarRate(up))
+    let downLine = line(arrow: "↓", arrowColor: .systemBlue, rate: menuBarRate(down))
+    let upSize = upLine.size()
+    let downSize = downLine.size()
+    let lineH = ceil(max(upSize.height, downSize.height))
+    let w = ceil(max(upSize.width, downSize.width))
+    let h = lineH * 2
+
+    let img = NSImage(size: NSSize(width: max(w, 1), height: h), flipped: false) { _ in
+        // Non-flipped space (origin bottom-left): upload on the top line, download on the bottom,
+        // both right-aligned so the digits stay put as the rate changes.
+        upLine.draw(at: NSPoint(x: w - ceil(upSize.width), y: lineH))
+        downLine.draw(at: NSPoint(x: w - ceil(downSize.width), y: 0))
+        return true
+    }
+    img.isTemplate = false   // coloured — must not be a template
+    return img
+}
+
+/// Short bytes/sec for the menu bar — one significant decimal from KB up, so the label stays narrow.
+private func menuBarRate(_ bytesPerSec: Double) -> String {
+    let v = max(0, bytesPerSec)
+    if v < 1000 { return String(format: "%.0f B/s", v) }
+    let kb = v / 1000
+    if kb < 1000 { return String(format: "%.0f KB/s", kb) }
+    let mb = kb / 1000
+    if mb < 1000 { return String(format: "%.1f MB/s", mb) }
+    return String(format: "%.1f GB/s", mb / 1000)
 }
 
 /// Mac + iPhone in one menu-bar item: laptop glyph + Mac battery, then iPhone glyph +
@@ -150,57 +193,3 @@ func dualMenuBarImage(macPct: Int, macCharging: Bool, phonePct: Int, phoneChargi
     return img
 }
 
-/// Single menu bar item. Mac-only: one line, battery-shape icon (+ optional %).
-/// With "Show iPhone/Android in menu bar" on and a device readable: two compact stacked
-/// lines instead — laptop/phone glyphs so the two percentages aren't ambiguous. Only one
-/// mobile device is ever shown at a time (iPhone takes priority when both are connected),
-/// to keep the menu bar from growing a third glyph.
-struct MenuBarLabel: View {
-    @ObservedObject var reader: BatteryReader
-    @ObservedObject var iosReader: IOSDeviceReader
-    @ObservedObject var androidReader: AndroidDeviceReader
-    @AppStorage("showMenuBarPercent") private var showMacPercent = true
-    @AppStorage("showIPhoneMenuBar") private var showIPhoneMenuBar = false
-    @AppStorage("showAndroidMenuBar") private var showAndroidMenuBar = false
-
-    private var iosDevice: IOSDeviceInfo? {
-        guard showIPhoneMenuBar,
-              let device = iosReader.devices.first,
-              device.chargePercent != nil else { return nil }
-        return device
-    }
-
-    private var androidDevice: AndroidDeviceInfo? {
-        guard showAndroidMenuBar,
-              let device = androidReader.devices.first,
-              device.levelPercent != nil else { return nil }
-        return device
-    }
-
-    var body: some View {
-        let macPct = Int(reader.info.chargePercent.rounded())
-
-        if let ios = iosDevice, let iosCp = ios.chargePercent {
-            // Both devices, baked into one image — no HStack for the menu bar to reverse.
-            Image(nsImage: dualMenuBarImage(macPct: macPct,
-                                            macCharging: reader.info.isPluggedIn,
-                                            phonePct: Int(iosCp.rounded()),
-                                            phoneCharging: ios.isPluggedIn,
-                                            phoneSymbol: "iphone",
-                                            showPercent: showMacPercent))
-        } else if let android = androidDevice, let level = android.levelPercent {
-            Image(nsImage: dualMenuBarImage(macPct: macPct,
-                                            macCharging: reader.info.isPluggedIn,
-                                            phonePct: level,
-                                            phoneCharging: android.isPluggedIn,
-                                            phoneSymbol: "candybarphone",
-                                            showPercent: showMacPercent))
-        } else {
-            // Number lives inside the battery, so there's just one element — no HStack
-            // ordering for the menu bar to reverse.
-            BatteryGlyph(level: reader.info.chargePercent / 100,
-                         charging: reader.info.isPluggedIn,
-                         percent: showMacPercent ? macPct : nil)
-        }
-    }
-}

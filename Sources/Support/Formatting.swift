@@ -12,3 +12,32 @@ func fmtMinutes(_ m: Int) -> String { "\(m / 60)h \(String(format: "%02d", m % 6
 func fmtGB(_ bytes: UInt64) -> String {
     String(format: "%.2f GB", Double(bytes) / 1_073_741_824)
 }
+
+/// Bytes → "55.8 MB" using decimal units (÷1000), matching how macOS reports network data transfer
+/// (bytes, KB, MB, GB, TB). Kept separate from fmtGB, which uses binary GiB for RAM.
+func fmtBytes(_ bytes: UInt64) -> String {
+    let units = ["bytes", "KB", "MB", "GB", "TB"]
+    var value = Double(bytes)
+    var i = 0
+    while value >= 1000 && i < units.count - 1 { value /= 1000; i += 1 }
+    // Whole bytes read as integers; everything larger keeps one decimal (like Activity Monitor).
+    return i == 0 ? "\(Int(value)) bytes" : String(format: "%.1f %@", value, units[i])
+}
+
+/// Bytes-per-second → "1.2 MB/s" for the live throughput rows.
+func fmtRate(_ bytesPerSec: Double) -> String {
+    fmtBytes(UInt64(max(0, bytesPerSec))) + "/s"
+}
+
+/// ISO-3166 alpha-2 country code → flag emoji (e.g. "VN" → 🇻🇳) by mapping each letter to its
+/// regional-indicator symbol. Returns "" for anything that isn't two letters.
+func flagEmoji(_ code: String) -> String {
+    let up = code.uppercased()
+    guard up.count == 2, up.allSatisfy({ $0.isLetter }) else { return "" }
+    let base: UInt32 = 0x1F1E6 - 0x41   // regional indicator "A" minus ASCII 'A'
+    var s = ""
+    for scalar in up.unicodeScalars {
+        if let flag = UnicodeScalar(base + scalar.value) { s.unicodeScalars.append(flag) }
+    }
+    return s
+}

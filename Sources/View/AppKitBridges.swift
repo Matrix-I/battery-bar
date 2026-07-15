@@ -5,10 +5,10 @@
 import SwiftUI
 import AppKit
 
-/// Reports when the hosting window becomes visible / hidden. MenuBarExtra(.window) builds its
-/// content once and just orders the popover window in and out, so SwiftUI's `.onAppear` doesn't
-/// refire per open — observing the NSWindow directly is the reliable signal. `isVisible` tracks
-/// ordered-in state (not mere occlusion), so covering the popover doesn't count as "closed".
+/// Reports when the hosting window becomes visible / hidden. The NSPopover hosting the SwiftUI
+/// content builds it once and just orders the popover window in and out, so SwiftUI's `.onAppear`
+/// doesn't refire per open — observing the NSWindow directly is the reliable signal. `isVisible`
+/// tracks ordered-in state (not mere occlusion), so covering the popover doesn't count as "closed".
 final class WindowVisibilityView: NSView {
     var onChange: ((Bool) -> Void)?
     var onScreenHeight: ((CGFloat) -> Void)?
@@ -27,13 +27,13 @@ final class WindowVisibilityView: NSView {
                                               NSWindow.didChangeOcclusionStateNotification,
                                               NSWindow.didChangeScreenNotification,
                                               NSWindow.willCloseNotification] {
-                nc.addObserver(self, selector: #selector(windowChanged), name: name, object: window)
+                nc.addObserver(self, selector: #selector(windowChanged(_:)), name: name, object: window)
             }
         }
         evaluate()
     }
 
-    @objc private func windowChanged() {
+    @objc private func windowChanged(_ note: Notification) {
         // Defer so order-out has settled before we read isVisible.
         DispatchQueue.main.async { [weak self] in self?.evaluate() }
     }
