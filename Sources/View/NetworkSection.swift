@@ -88,7 +88,7 @@ struct NetworkSection: View {
 
     @ViewBuilder
     private var interfaceBlock: some View {
-        NetSectionCaption("INTERFACE")
+        SectionCaption("INTERFACE")
         VStack(spacing: 6) {
             InfoRow(label: "Interface", value: interfaceValue)
             NetBadgeRow(label: "Status", up: info.isUp)
@@ -157,7 +157,7 @@ struct NetworkSection: View {
 
     @ViewBuilder
     private var addressBlock: some View {
-        NetSectionCaption("ADDRESS")
+        SectionCaption("ADDRESS")
         VStack(spacing: 6) {
             if let v4 = info.localIPv4 { InfoRow(label: "Local IP", value: v4) }
             if let v6 = info.localIPv6 { InfoRow(label: "Local IPv6", value: v6) }
@@ -268,23 +268,6 @@ private struct NetTotalRow: View {
             Text(value).fontWeight(.medium).monospacedDigit().lineLimit(1)
         }
         .font(.system(size: 12))
-    }
-}
-
-/// A centred small-caps caption flanked by hairlines — the "INTERFACE" / "ADDRESS" separators.
-private struct NetSectionCaption: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-    var body: some View {
-        HStack(spacing: 8) {
-            Rectangle().fill(Color.secondary.opacity(0.3)).frame(height: 1)
-            Text(text)
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.5)
-                .foregroundStyle(.secondary)
-                .fixedSize()
-            Rectangle().fill(Color.secondary.opacity(0.3)).frame(height: 1)
-        }
     }
 }
 

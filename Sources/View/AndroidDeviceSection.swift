@@ -113,7 +113,7 @@ struct AndroidDevicesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("🤖 Android (USB)").font(.caption).foregroundStyle(.secondary)
+            SectionCaption("🤖 Android (USB)")
 
             if reader.toolsMissing {
                 VStack(alignment: .leading, spacing: 4) {

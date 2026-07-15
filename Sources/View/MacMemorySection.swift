@@ -19,9 +19,7 @@ struct MacMemorySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("🧠 Memory (live)").font(.caption).foregroundStyle(.secondary)
-                Spacer()
+            SectionCaption("🧠 Memory (live)") {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showDetails.toggle() }
                 } label: {

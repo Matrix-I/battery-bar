@@ -119,22 +119,19 @@ struct BatteryDetailView: View {
             // 🌀 Fan speeds from the SMC (live, ~1 Hz) — pinned above the battery readout.
             // Skipped entirely on fanless Macs (e.g. MacBook Air), so the battery header stays first there.
             if !i.fans.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("🌀 Fans (live)").font(.caption).foregroundStyle(.secondary)
+                SectionCaption("🌀 Fans (live)")
+                VStack(spacing: 6) {
                     ForEach(Array(i.fans.enumerated()), id: \.offset) { idx, rpm in
                         InfoRow(label: i.fans.count > 1 ? "Fan \(idx + 1)" : "Fan",
                                 value: "\(Int(rpm.rounded())) rpm")
                     }
                 }
-
-                Divider()
             }
 
             // 🧠 Live RAM breakdown (App / Wired / Compressed / Free + swap) — pinned right below
             // the fans, above the battery readout. nil only if the VM stats read fails.
             if let mem = i.memory {
                 MacMemorySection(mem: mem)
-                Divider()
             }
 
             // Header
@@ -224,29 +221,24 @@ struct BatteryDetailView: View {
             // ⚡ Live power rails from the SMC — these tick every second, unlike the
             // battery-gauge values above (which the OS only refreshes every ~30–60 s).
             if i.smcSystemTotalW != nil || i.smcDCInW != nil {
-                ZStack {
-                    Divider()
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                showMacPowerLiveDetails.toggle()
-                            }
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(showMacPowerLiveDetails ? Color.white : Color.secondary)
-                                .padding(4)
-                                .background(
-                                    Circle().fill(showMacPowerLiveDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                                )
+                SectionCaption("⚡ Power (live)") {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showMacPowerLiveDetails.toggle()
                         }
-                        .buttonStyle(.plain)
-                        .help(showMacPowerLiveDetails ? "Show less" : "Show more")
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(showMacPowerLiveDetails ? Color.white : Color.secondary)
+                            .padding(4)
+                            .background(
+                                Circle().fill(showMacPowerLiveDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                            )
                     }
+                    .buttonStyle(.plain)
+                    .help(showMacPowerLiveDetails ? "Show less" : "Show more")
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("⚡ Power (live)").font(.caption).foregroundStyle(.secondary)
                     if let v = i.smcSystemTotalW { InfoRow(label: "System Total", value: String(format: "%.2f W", v)) }
                     if showMacPowerLiveDetails {
                         if let v = i.smcDCInW, v > 0.05 { InfoRow(label: "DC In", value: String(format: "%.2f W", v)) }
@@ -258,12 +250,8 @@ struct BatteryDetailView: View {
                 }
             }
 
-            Divider()
-
             IOSDevicesSection(reader: iosReader)
                 .onAppear { iosReader.refresh() }
-
-            Divider()
 
             AndroidDevicesSection(reader: androidReader)
                 .onAppear { androidReader.refresh() }

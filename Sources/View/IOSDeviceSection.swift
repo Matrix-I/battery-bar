@@ -140,7 +140,7 @@ struct IOSDevicesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("📱 iPhone / iPad (USB / Wi-Fi)").font(.caption).foregroundStyle(.secondary)
+            SectionCaption("📱 iPhone / iPad (USB / Wi-Fi)")
 
             if reader.toolsMissing {
                 VStack(alignment: .leading, spacing: 4) {
