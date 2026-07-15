@@ -90,10 +90,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         other.performClose(nil)                 // single-popover rule — close the other first, cleanly
         guard let button = item.button else { return }
+
+        // An accessory app isn't the active app, so a freshly shown popover opens *unfocused* — its
+        // controls wouldn't respond until you clicked into it. Activate the app FIRST (before show,
+        // using the cooperative-activation API on macOS 14+ where the ignoringOtherApps variant is
+        // deprecated and unreliable), then show, then key the popover window on the next run-loop
+        // turn — by then activation has taken effect, so makeKey() actually sticks.
+        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        // An accessory app isn't active by default; activating lets the popover take key focus so
-        // its controls (toggles, buttons, text selection) work on the first click.
-        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            popover.contentViewController?.view.window?.makeKey()
+        }
     }
 
     private func closeAll() {
