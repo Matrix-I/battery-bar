@@ -26,7 +26,7 @@ final class IOSDeviceReader: ObservableObject {
     /// disappears. Short when it drops out of USB enumeration entirely (usually a real unplug),
     /// longer when it's still enumerated but the battery read fails (e.g. locked / another app holds
     /// the lockdown session, which tends to recover on its own).
-    private static let staleGraceGone: TimeInterval = 5
+    private static let staleGraceGone: TimeInterval = 3
     private static let staleGraceUnreadable: TimeInterval = 30
 
     init() {
