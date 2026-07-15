@@ -77,8 +77,11 @@ final class NetworkReader: NSObject, ObservableObject {
         maybePublicIP(force: true)
     }
 
-    /// Ask for the Location permission that unlocks the Wi-Fi SSID. No-op if already decided.
+    /// Ask for the Location permission that unlocks the Wi-Fi SSID. Only triggers the system prompt
+    /// while the status is undetermined — once the user has decided, macOS won't prompt again, so
+    /// we don't try (the UI routes to System Settings instead).
     func requestLocationForSSID() {
+        guard locationManager.authorizationStatus == .notDetermined else { return }
         locationManager.requestWhenInUseAuthorization()
     }
 

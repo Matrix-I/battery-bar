@@ -57,8 +57,28 @@ cat > "$APP.app/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Ad-hoc sign (not required for a local build, but cleaner)
-codesign --force -s - "$APP.app" 2>/dev/null || true
+# Code signing.
+#
+# macOS ties granted permissions (TCC: Location — used for the Wi-Fi network name — Screen
+# Recording, etc.) to the code-signing "designated requirement". An *ad-hoc* signature's requirement
+# is the binary's cdhash, which changes on every build, so an ad-hoc-signed app is treated as brand
+# new after each rebuild/version bump and re-prompts for permission. Signing with a *stable* identity
+# keeps the requirement constant (identifier + certificate), so permissions persist across upgrades.
+#
+# Set BATTERYBAR_SIGN_IDENTITY to a code-signing certificate name to use it; a free self-signed one
+# works fine for local use. To create one: Keychain Access ▸ Certificate Assistant ▸ Create a
+# Certificate… → Name "BatteryBar Local", Identity Type "Self Signed Root", Certificate Type
+# "Code Signing". Then either `export BATTERYBAR_SIGN_IDENTITY="BatteryBar Local"` or just name it
+# that (the default below). Without a matching identity we fall back to ad-hoc (re-prompts remain).
+SIGN_IDENTITY="${BATTERYBAR_SIGN_IDENTITY:-BatteryBar Local}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -qF "$SIGN_IDENTITY"; then
+    echo "🔏 Signing with stable identity: $SIGN_IDENTITY (permissions persist across upgrades)"
+    codesign --force --deep -s "$SIGN_IDENTITY" "$APP.app"
+else
+    echo "🔏 No stable signing identity ('$SIGN_IDENTITY') — ad-hoc signing."
+    echo "   Permissions (e.g. Location) will re-prompt after each rebuild. See build_app.sh header."
+    codesign --force -s - "$APP.app" 2>/dev/null || true
+fi
 
 # Force LaunchServices to re-register this exact bundle and drop any cached icon render, so the
 # freshly built AppIcon appears immediately (in Finder and in notifications posted by the app)

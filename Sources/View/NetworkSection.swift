@@ -131,14 +131,20 @@ struct NetworkSection: View {
             let rssi = info.rssi.map { " (\($0))" } ?? ""
             InfoRow(label: "Network", value: ssid + rssi)
         } else if needsLocationForSSID {
+            let decided = reader.locationStatus != .notDetermined  // already asked once
             HStack {
                 Text("Network")
                 Spacer()
                 Button {
-                    reader.requestLocationForSSID()
+                    if decided {
+                        // The OS only prompts once; once the user has decided, re-requesting is a
+                        // no-op, so send them to System Settings to flip it on instead.
+                        openLocationSettings()
+                    } else {
+                        reader.requestLocationForSSID()   // the single system prompt
+                    }
                 } label: {
-                    Text(reader.locationStatus == .denied || reader.locationStatus == .restricted
-                         ? "Enable in Settings ›" : "Show name (allow Location)")
+                    Text(decided ? "Enable in Settings ›" : "Show name (allow Location)")
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.plain)
@@ -152,6 +158,12 @@ struct NetworkSection: View {
 
     private var needsLocationForSSID: Bool {
         reader.locationStatus != .authorized && reader.locationStatus != .authorizedAlways
+    }
+
+    private func openLocationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     // MARK: Address block
