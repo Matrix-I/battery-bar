@@ -88,57 +88,5 @@ struct AndroidDeviceRow: View {
     }
 }
 
-struct AndroidDevicesSection: View {
-    @ObservedObject var reader: AndroidDeviceReader
-    @State private var showFullDetails = false
-
-    private var hasDevices: Bool {
-        !reader.toolsMissing && reader.statusMessage == nil && !reader.devices.isEmpty
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionCaption("🤖 Android (USB)") {
-                if hasDevices {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showFullDetails.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
-                            .padding(4)
-                            .background(
-                                Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help(showFullDetails ? "Show less" : "Show more")
-                }
-            }
-
-            if reader.toolsMissing {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Missing adb.").font(.caption2).foregroundStyle(.orange)
-                    Text("brew install --cask android-platform-tools")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-            } else if let status = reader.statusMessage {
-                Text(status).font(.caption2).foregroundStyle(.secondary)
-            } else if reader.devices.isEmpty {
-                Text("No devices connected.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(reader.devices) { device in
-                        AndroidDeviceRow(device: device, showFullDetails: showFullDetails)
-                        if device.id != reader.devices.last?.id { Divider() }
-                    }
-                }
-            }
-        }
-    }
-}
+// The section wrapper (AndroidDevicesSection) was inlined into BatteryDetailView as the
+// `androidSection` computed property — same reasoning as the iPhone section. Only the row remains here.

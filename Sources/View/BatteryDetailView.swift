@@ -40,6 +40,20 @@ struct BatteryDetailView: View {
     @AppStorage("showMacFullDetails") private var showMacFullDetails = false
     @AppStorage("showMacPowerLiveDetails") private var showMacPowerLiveDetails = false
 
+    // Show-more state for the iPhone / Android sections. Owned HERE — the same view that renders those
+    // sections (see iPhoneSection / androidSection) and measures the popover height — exactly like the
+    // Mac toggles above.
+    //
+    // iPhone uses @AppStorage, NOT @State, and that is the whole fix for the expand "giật": an @AppStorage
+    // write propagates back through UserDefaults on its own publish cycle, OUTSIDE the withAnimation
+    // transaction, so SwiftUI resizes the popover in a single instant step (frame-analysis: 0 ramp frames,
+    // identical to the Mac "Battery" toggle). A @State toggle animates the height over ~9 frames, and the
+    // self-measuring height machinery (GeometryReader → PanelHeightPreferenceKey → measuredContentHeight)
+    // stutters during that ramp — overshooting and reversing for a frame. So the clean-looking Mac toggle
+    // is clean precisely BECAUSE @AppStorage skips the animation; matching it here removes the jitter.
+    @AppStorage("showIPhoneFullDetails") private var showIPhoneFullDetails = false
+    @State private var showAndroidFullDetails = false
+
     // Read by TemperatureAlerter (same key, same default) to decide whether to warn on a hot iPhone.
     @AppStorage("alertHotIPhone") private var alertHotIPhone = true
 
@@ -102,10 +116,11 @@ struct BatteryDetailView: View {
         .background(WindowVisibilityReporter(
             onChange: { open in
                 reader.setPanelOpen(open)
-                if open {
-                    iosReader.refresh()      // one immediate read on open; it stays on its slow cadence
-                    androidReader.refresh()
-                }
+                // No forced iOS/Android read on open. Those readers already poll continuously in the
+                // background (their 1 s timers run whether the panel is open or not), so `devices` is
+                // always warm — opening just DISPLAYS the cached data. A fresh on-open read would come
+                // back at an unpredictable moment (libimobiledevice is slow) and, if it landed while the
+                // user is expanding a section, snap the animation. The Refresh button still forces a read.
             },
             onScreenHeight: { h in if h > 0 { panelScreenHeight = h } }
         ))
@@ -247,11 +262,13 @@ struct BatteryDetailView: View {
                 }
             }
 
-            IOSDevicesSection(reader: iosReader)
-                .onAppear { iosReader.refresh() }
-
-            AndroidDevicesSection(reader: androidReader)
-                .onAppear { androidReader.refresh() }
+            // iPhone / Android built EXACTLY like the Mac "Battery" block above: a single value read
+            // inline, no ForEach, no separate row View. The old ForEach over the 1 Hz-replaced
+            // `iosReader.devices` array rebuilt its rows on every reader tick, and a tick landing during
+            // the 0.15 s expand snapped the animation — that was the stutter. Reading one device inline
+            // (like the Mac block reads `reader.info`) can't be interrupted that way.
+            iPhoneSection
+            androidSection
         }
         .padding(14)
         .fixedSize(horizontal: false, vertical: true)
@@ -261,6 +278,207 @@ struct BatteryDetailView: View {
             }
         )
         .onPreferenceChange(PanelHeightPreferenceKey.self) { measuredContentHeight = $0 }
+    }
+
+    // Time-only for a reading captured today; date + time once it's from an earlier day, so a health
+    // figure that is actually days old isn't misread as a same-day reading. (Ported from the old
+    // IOSDeviceRow when the iPhone block was inlined to match the Mac battery block.)
+    private static func readingStamp(_ at: Date) -> String {
+        Calendar.current.isDateInToday(at)
+            ? at.formatted(date: .omitted, time: .shortened)
+            : at.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    // 📱 iPhone / iPad — built to mirror the Mac "Battery" block EXACTLY: one value read inline
+    // (`iosReader.devices.first`, the primary connected iPhone), its rows written straight into this
+    // VStack with `if showIPhoneFullDetails` toggling the detail rows — no ForEach, no separate row
+    // View. The previous ForEach over the 1 Hz-replaced `iosReader.devices` array rebuilt its row
+    // views on every reader tick; a tick landing mid-expand snapped the 0.15 s animation. An inline
+    // single-value read (exactly how the Mac block reads `reader.info`) can't be interrupted that way.
+    // Only the primary device is shown now — same single-battery shape as the Mac block.
+    @ViewBuilder
+    private var iPhoneSection: some View {
+        let device = iosReader.devices.first
+        VStack(alignment: .leading, spacing: 8) {
+            SectionCaption("📱 iPhone / iPad (USB / Wi-Fi)") {
+                if device != nil {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showIPhoneFullDetails.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(showIPhoneFullDetails ? Color.white : Color.secondary)
+                            .padding(4)
+                            .background(
+                                Circle().fill(showIPhoneFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(showIPhoneFullDetails ? "Show less" : "Show more")
+                }
+            }
+
+            if iosReader.toolsMissing {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Missing libimobiledevice.").font(.caption2).foregroundStyle(.orange)
+                    Text("brew install libimobiledevice")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } else if let status = iosReader.statusMessage {
+                Text(status).font(.caption2).foregroundStyle(.secondary)
+            } else if let device {
+                // The single device's rows, written inline — mirrors the Mac battery block's inline rows.
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(device.name).font(.caption).fontWeight(.semibold).lineLimit(1)
+                        Spacer()
+                        let sub = [device.model.isEmpty ? nil : device.model,
+                                   device.iosVersion.isEmpty ? nil : "iOS \(device.iosVersion)"]
+                            .compactMap { $0 }.joined(separator: " · ")
+                        if !sub.isEmpty {
+                            Text(sub).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+
+                    if device.isNetwork {
+                        Text("📶 Connected over Wi-Fi (no USB data connection)")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+
+                    if device.isStale {
+                        Text("⟳ last known data — connection reconnecting")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+
+                    if device.isLocked {
+                        if device.maxCapacity != nil, let at = device.capturedAt {
+                            Text("🔒 Battery health from last reading (\(Self.readingStamp(at))) — unlock the iPhone to refresh.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        } else {
+                            Text("🔒 Unlock the iPhone to read battery health.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let err = device.errorMessage {
+                        Text(err).font(.caption2).foregroundStyle(.red)
+                    } else if device.chargePercent == nil && device.healthPercent == nil {
+                        if !device.isLocked {
+                            Text("⚠ Couldn't read health data — unlock the device + Trust, then tap Refresh.")
+                                .font(.caption2).foregroundStyle(.orange)
+                        }
+                    } else {
+                        if let cp = device.chargePercent {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Charge").font(.caption2).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(String(format: "%.1f%%", cp)).font(.caption).fontWeight(.medium).monospacedDigit()
+                            }
+                            BarView(pct: cp, color: .blue)
+                        }
+                        if let hp = device.healthPercent {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Health").font(.caption2).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(String(format: "%.1f%%", hp))
+                                    .font(.caption).fontWeight(.medium).monospacedDigit()
+                                    .foregroundStyle(healthColor(hp))
+                            }
+                            BarView(pct: hp, color: healthColor(hp))
+                        }
+                        if let max = device.maxCapacity {
+                            InfoRow(label: "Full charge capacity", value: "\(max) mAh")
+                        }
+                        if let design = device.designCapacity {
+                            InfoRow(label: "Design capacity", value: "\(design) mAh")
+                        }
+                        if let cc = device.cycleCount {
+                            InfoRow(label: "Cycle count", value: "\(cc)")
+                        }
+
+                        if showIPhoneFullDetails {
+                            if let t = device.temperatureC {
+                                InfoRow(label: "Temperature", value: String(format: "%.1f °C", t))
+                            }
+                            if let v = device.voltageV {
+                                InfoRow(label: "Voltage", value: String(format: "%.2f V", v))
+                            }
+                            if device.isCharging, let w = device.watts, w > 0.05 {
+                                InfoRow(label: "Charging with", value: String(format: "%.1f W", w))
+                            }
+                            if device.externalConnected {
+                                InfoRow(label: "Status",
+                                        value: device.isCharging ? "Charging"
+                                            : (device.fullyCharged ? "Fully charged" : "Plugged in, not charging"))
+                            }
+                            if !device.serial.isEmpty {
+                                InfoRow(label: "Serial", value: device.serial)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("No devices connected.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        // No .onAppear refresh: the background timer keeps `iosReader.devices` warm, so this just shows
+        // the cache. Avoids a slow read landing mid-animation (see the WindowVisibilityReporter note).
+    }
+
+    // 🤖 Android — inline for the same reason as iPhoneSection (was an AndroidDevicesSection child that
+    // observed androidReader on its own transaction).
+    @ViewBuilder
+    private var androidSection: some View {
+        let hasDevices = !androidReader.toolsMissing && androidReader.statusMessage == nil && !androidReader.devices.isEmpty
+        VStack(alignment: .leading, spacing: 8) {
+            SectionCaption("🤖 Android (USB)") {
+                if hasDevices {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showAndroidFullDetails.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(showAndroidFullDetails ? Color.white : Color.secondary)
+                            .padding(4)
+                            .background(
+                                Circle().fill(showAndroidFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(showAndroidFullDetails ? "Show less" : "Show more")
+                }
+            }
+
+            if androidReader.toolsMissing {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Missing adb.").font(.caption2).foregroundStyle(.orange)
+                    Text("brew install --cask android-platform-tools")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } else if let status = androidReader.statusMessage {
+                Text(status).font(.caption2).foregroundStyle(.secondary)
+            } else if androidReader.devices.isEmpty {
+                Text("No devices connected.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(androidReader.devices) { device in
+                        AndroidDeviceRow(device: device, showFullDetails: showAndroidFullDetails)
+                        if device.id != androidReader.devices.last?.id { Divider() }
+                    }
+                }
+            }
+        }
+        // No .onAppear refresh — background timer keeps the cache warm; opening just shows it.
     }
 
     // Pinned below the scroll area — never scrolls away, so the menu-bar toggles and Refresh/Quit
