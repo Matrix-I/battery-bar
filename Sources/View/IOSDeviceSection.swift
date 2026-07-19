@@ -5,7 +5,9 @@ import SwiftUI
 
 struct IOSDeviceRow: View {
     let device: IOSDeviceInfo
-    @State private var showFullDetails = false
+    /// Driven by the section-level toggle sitting on the "iPhone / iPad" title line, so every
+    /// device row expands/collapses together (mirrors the "Power (live)" section header).
+    let showFullDetails: Bool
 
     /// Time-only for a reading captured today; date + time once it's from an earlier day, so a
     /// health figure that is actually days old isn't misread as a same-day reading.
@@ -43,13 +45,20 @@ struct IOSDeviceRow: View {
                 // is at the passcode lock screen (the common case) — occasionally also when another
                 // app is holding the relay. Charge may still be live. Guide the user to unlock
                 // without asserting the exact cause; it refreshes on its own once readable again.
-                if device.maxCapacity != nil, let at = device.capturedAt {
+                if (device.maxCapacity != nil || device.reportedHealthPercent != nil), let at = device.capturedAt {
                     Text("🔒 Battery health from last reading (\(Self.readingStamp(at))) — unlock the iPhone to refresh.")
                         .font(.caption2).foregroundStyle(.secondary)
                 } else {
                     Text("🔒 Unlock the iPhone to read battery health.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
+            } else if device.limitedData {
+                // Read came from the GasGauge fallback (this iOS doesn't populate the full battery
+                // registry) — cycle count, maximum capacity and charge are real; the mAh capacities,
+                // temperature, voltage and serial simply aren't exposed, so note that rather than
+                // leaving the reader looking for rows that never appear.
+                Text("ⓘ This iOS reports only cycle count, maximum capacity & charge over USB.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
 
             if let err = device.errorMessage {
@@ -89,28 +98,6 @@ struct IOSDeviceRow: View {
                     InfoRow(label: "Cycle count", value: "\(cc)")
                 }
 
-                ZStack {
-                    Divider()
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                showFullDetails.toggle()
-                            }
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
-                                .padding(4)
-                                .background(
-                                    Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .help(showFullDetails ? "Show less" : "Show more")
-                    }
-                }
-
                 if showFullDetails {
                     if let t = device.temperatureC {
                         InfoRow(label: "Temperature", value: String(format: "%.1f °C", t))
@@ -137,10 +124,33 @@ struct IOSDeviceRow: View {
 
 struct IOSDevicesSection: View {
     @ObservedObject var reader: IOSDeviceReader
+    @State private var showFullDetails = false
+
+    private var hasDevices: Bool {
+        !reader.toolsMissing && reader.statusMessage == nil && !reader.devices.isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionCaption("📱 iPhone / iPad (USB / Wi-Fi)")
+            SectionCaption("📱 iPhone / iPad (USB / Wi-Fi)") {
+                if hasDevices {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showFullDetails.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
+                            .padding(4)
+                            .background(
+                                Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(showFullDetails ? "Show less" : "Show more")
+                }
+            }
 
             if reader.toolsMissing {
                 VStack(alignment: .leading, spacing: 4) {
@@ -162,7 +172,7 @@ struct IOSDevicesSection: View {
                 // always has a proper intrinsic size, so let the popover grow to fit instead.
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(reader.devices) { device in
-                        IOSDeviceRow(device: device)
+                        IOSDeviceRow(device: device, showFullDetails: showFullDetails)
                         if device.id != reader.devices.last?.id { Divider() }
                     }
                 }

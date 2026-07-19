@@ -5,7 +5,9 @@ import SwiftUI
 
 struct AndroidDeviceRow: View {
     let device: AndroidDeviceInfo
-    @State private var showFullDetails = false
+    /// Driven by the section-level toggle sitting on the "Android" title line, so every device row
+    /// expands/collapses together (mirrors the "Power (live)" section header).
+    let showFullDetails: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -56,28 +58,6 @@ struct AndroidDeviceRow: View {
                     InfoRow(label: "Cycle count", value: "\(cc)")
                 }
 
-                ZStack {
-                    Divider()
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                showFullDetails.toggle()
-                            }
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
-                                .padding(4)
-                                .background(
-                                    Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .help(showFullDetails ? "Show less" : "Show more")
-                    }
-                }
-
                 if showFullDetails {
                     if let health = device.healthText {
                         InfoRow(label: "Health status", value: health)
@@ -110,10 +90,33 @@ struct AndroidDeviceRow: View {
 
 struct AndroidDevicesSection: View {
     @ObservedObject var reader: AndroidDeviceReader
+    @State private var showFullDetails = false
+
+    private var hasDevices: Bool {
+        !reader.toolsMissing && reader.statusMessage == nil && !reader.devices.isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionCaption("🤖 Android (USB)")
+            SectionCaption("🤖 Android (USB)") {
+                if hasDevices {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showFullDetails.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(showFullDetails ? Color.white : Color.secondary)
+                            .padding(4)
+                            .background(
+                                Circle().fill(showFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(showFullDetails ? "Show less" : "Show more")
+                }
+            }
 
             if reader.toolsMissing {
                 VStack(alignment: .leading, spacing: 4) {
@@ -131,7 +134,7 @@ struct AndroidDevicesSection: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(reader.devices) { device in
-                        AndroidDeviceRow(device: device)
+                        AndroidDeviceRow(device: device, showFullDetails: showFullDetails)
                         if device.id != reader.devices.last?.id { Divider() }
                     }
                 }
