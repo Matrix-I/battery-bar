@@ -37,12 +37,6 @@ struct CPUInfo {
     // Seconds since the machine last booted.
     var uptimeSeconds: Double = 0
 
-    // System load averages over the last 1 / 5 / 15 minutes (getloadavg) — the average number of
-    // runnable threads, not a percentage, so it can exceed the core count on a busy machine.
-    var loadAverage1 = 0.0
-    var loadAverage5 = 0.0
-    var loadAverage15 = 0.0
-
     // The heaviest CPU consumers right now (from `ps`, refreshed a little slower than the load).
     var topProcesses: [ProcessSample] = []
 

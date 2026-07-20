@@ -36,8 +36,6 @@ struct CPUDetailView: View {
 
             details
 
-            averageLoad
-
             frequency
 
             topProcesses
@@ -134,20 +132,6 @@ struct CPUDetailView: View {
     }
 
     private func pct(_ v: Double) -> String { String(format: "%.0f%%", v) }
-
-    // MARK: Average load
-
-    @ViewBuilder
-    private var averageLoad: some View {
-        SectionCaption("AVERAGE LOAD")
-        VStack(spacing: 6) {
-            InfoRow(label: "1 minute", value: load(info.loadAverage1))
-            InfoRow(label: "5 minutes", value: load(info.loadAverage5))
-            InfoRow(label: "15 minutes", value: load(info.loadAverage15))
-        }
-    }
-
-    private func load(_ v: Double) -> String { String(format: "%.2f", v) }
 
     // MARK: Frequency
 
