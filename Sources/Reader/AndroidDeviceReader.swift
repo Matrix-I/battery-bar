@@ -134,6 +134,24 @@ final class AndroidDeviceReader: ObservableObject {
         return nil
     }
 
+    /// Android 14+ attaches EXTRA_CYCLE_COUNT ("android.os.extra.CYCLE_COUNT") to the sticky
+    /// ACTION_BATTERY_CHANGED broadcast whenever the health HAL reports a cycle count — even when
+    /// `dumpsys battery` omits it and sysfs is root-gated (Xiaomi/HyperOS, MediaTek). The sticky
+    /// intent is readable by the shell, so scrape it out of `dumpsys activity broadcasts`. That dump
+    /// is several MB, but the sticky battery intent sits near the top and `grep | head -1`
+    /// short-circuits on the first hit, so on-device generation stops in well under a tenth of a
+    /// second. Cached by the caller, so it runs once per connection.
+    private func readBroadcastCycleCount(_ path: String, serial: String) -> Int? {
+        let probe = "dumpsys activity broadcasts 2>/dev/null | " +
+                    "grep -o 'android.os.extra.CYCLE_COUNT=[0-9]*' | head -1"
+        guard let data = DeviceTool.run(path, ["-s", serial, "shell", probe]),
+              let s = String(data: data, encoding: .utf8),
+              let eq = s.firstIndex(of: "="),
+              let n = Int(s[s.index(after: eq)...].trimmingCharacters(in: .whitespacesAndNewlines)),
+              n > 0 else { return nil }
+        return n
+    }
+
     /// Fallback when `dumpsys battery` carries no cycle count: read the kernel gas gauge's
     /// `cycle_count` from sysfs. World-readable on some devices (e.g. Pixel), but root-only or absent
     /// on others (Xiaomi/MediaTek, where it lives behind a non-dumpable health HAL) — returns nil when
@@ -217,8 +235,11 @@ final class AndroidDeviceReader: ObservableObject {
                 if lastAttempt == nil || Date().timeIntervalSince(lastAttempt!) > Self.capacityRetryInterval {
                     capacityLastAttempt[entry.serial] = Date()
                     let cap = readCapacity(adbPath, serial: entry.serial)
-                    // Only worth an extra sysfs cat when dumpsys didn't already report cycles.
-                    let cyc = dev.cycleCount ?? readSysfsCycleCount(adbPath, serial: entry.serial)
+                    // Only worth the heavier probes when dumpsys battery didn't already report cycles:
+                    // the Android 14+ sticky-broadcast extra first, then the root-gated sysfs node.
+                    let cyc = dev.cycleCount
+                        ?? readBroadcastCycleCount(adbPath, serial: entry.serial)
+                        ?? readSysfsCycleCount(adbPath, serial: entry.serial)
                     if cap.max != nil || cap.design != nil || cyc != nil {
                         capacityCache[entry.serial] = (cap.max, cap.design, cyc)
                         dev.maxCapacity = cap.max

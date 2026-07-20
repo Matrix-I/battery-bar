@@ -33,11 +33,12 @@ struct AndroidDeviceInfo: Identifiable {
     // debug dump, and "Charge counter" barely changes between 1s polls) — so unlike iOS/Mac's
     // "Charging with" (live V×I), this is the charger/port's negotiated ceiling, not a live reading.
     var maxChargingWatts: Double?
-    // Best-effort. Android exposes battery cycle count inconsistently: some Android 14+ OEM builds
-    // print it in `dumpsys battery` (under varying key spellings), and some kernels expose the gas
-    // gauge's `cycle_count` in sysfs — but many devices (e.g. Xiaomi/HyperOS, where it sits behind a
-    // non-dumpable health HAL) expose nothing without root. AndroidDeviceReader tries the dumpsys keys
-    // then the sysfs fallback; when neither yields a value this stays nil and the row stays hidden.
+    // Android exposes battery cycle count inconsistently, so AndroidDeviceReader tries three sources in
+    // order: (1) `dumpsys battery` keys (some OEM builds print it directly); (2) the Android 14+
+    // EXTRA_CYCLE_COUNT on the sticky ACTION_BATTERY_CHANGED broadcast, scraped from `dumpsys activity
+    // broadcasts` — this is what works on Xiaomi/HyperOS, where the count sits behind a non-dumpable
+    // health HAL and root-only sysfs; (3) the kernel gas gauge's `cycle_count` in sysfs (readable on
+    // e.g. Pixel). When none yield a value this stays nil and the row stays hidden.
     var cycleCount: Int?
     var serial = ""
     var errorMessage: String?
