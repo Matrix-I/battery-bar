@@ -182,7 +182,7 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Current charge")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.system(size: 14)).foregroundStyle(.white)
                     Spacer()
                     Text(String(format: "%.1f%%", i.chargePercent))
                         .font(.system(size: 16, weight: .semibold))
@@ -199,7 +199,7 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Maximum Capacity")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.system(size: 14)).foregroundStyle(.white)
                     Spacer()
                     Text(String(format: "%.0f%%", i.displayMaximumCapacity))
                         .font(.system(size: 16, weight: .semibold))
@@ -380,7 +380,7 @@ struct BatteryDetailView: View {
                             if let cp = device.chargePercent {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(alignment: .firstTextBaseline) {
-                                        Text("Current charge").font(.caption).foregroundStyle(.secondary)
+                                        Text("Current charge").font(.system(size: 14)).foregroundStyle(.white)
                                         Spacer()
                                         Text(String(format: "%.1f%%", cp))
                                             .font(.system(size: 16, weight: .semibold)).monospacedDigit()
@@ -395,7 +395,7 @@ struct BatteryDetailView: View {
                             if let mc = device.maximumCapacityPercent {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(alignment: .firstTextBaseline) {
-                                        Text("Maximum Capacity").font(.caption).foregroundStyle(.secondary)
+                                        Text("Maximum Capacity").font(.system(size: 14)).foregroundStyle(.white)
                                         Spacer()
                                         Text(String(format: "%.0f%%", mc))
                                             .font(.system(size: 16, weight: .semibold)).monospacedDigit()

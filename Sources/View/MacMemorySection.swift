@@ -36,7 +36,7 @@ struct MacMemorySection: View {
             }
 
             HStack(alignment: .firstTextBaseline) {
-                Text("Used").font(.caption).foregroundStyle(.secondary)
+                Text("Used").font(.system(size: 14)).foregroundStyle(.white)
                 Spacer()
                 Text(fmtGB(mem.used))
                     .font(.system(size: 16, weight: .semibold))
@@ -97,7 +97,7 @@ private struct MemoryLegendRow: View {
         HStack {
             RoundedRectangle(cornerRadius: 2).fill(color)
                 .frame(width: 9, height: 9)
-            Text(label).foregroundStyle(.secondary)
+            Text(label).foregroundStyle(.white)
             Spacer()
             Text(value)
                 .fontWeight(.medium)

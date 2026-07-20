@@ -37,9 +37,9 @@ struct SectionCaption<Trailing: View>: View {
             HStack(spacing: 8) {
                 hairline
                 Text(text)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .tracking(1.5)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white)
                     .fixedSize()
                 hairline
             }

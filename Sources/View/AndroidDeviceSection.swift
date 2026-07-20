@@ -32,7 +32,7 @@ struct AndroidDeviceRow: View {
             } else {
                 if let level = device.levelPercent {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Current charge").font(.caption2).foregroundStyle(.secondary)
+                        Text("Current charge").font(.system(size: 14)).foregroundStyle(.white)
                         Spacer()
                         Text("\(level)%").font(.caption).fontWeight(.medium).monospacedDigit()
                     }
@@ -40,7 +40,7 @@ struct AndroidDeviceRow: View {
                 }
                 if let mc = device.maximumCapacityPercent {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Maximum Capacity").font(.caption2).foregroundStyle(.secondary)
+                        Text("Maximum Capacity").font(.system(size: 14)).foregroundStyle(.white)
                         Spacer()
                         Text(String(format: "%.0f%%", mc))
                             .font(.caption).fontWeight(.medium).monospacedDigit()
