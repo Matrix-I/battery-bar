@@ -43,7 +43,7 @@ final class CPUReader: ObservableObject {
     private var topReadInFlight = false
     private var lastTopRead = Date.distantPast
     private let topQueue = DispatchQueue(label: "CPUReader.top", qos: .utility)
-    private static let topInterval: TimeInterval = 2
+    private static let topInterval: TimeInterval = 1
     private static let topCount = 6
 
     private static let idleInterval: TimeInterval = 2   // menu-bar % only
