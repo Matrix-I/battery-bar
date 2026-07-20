@@ -3,13 +3,16 @@
 // Mach host statistics (host_processor_info), the AppleSMC temperature sensors, and sysctl.
 
 import Foundation
+import AppKit
 
-/// One row of the TOP PROCESSES table: a process's accounting name and its CPU share (as reported
-/// by `ps`, a decaying average, so it can momentarily exceed 100 % across multiple cores).
+/// One row of the TOP PROCESSES table: a process's display name, app icon (nil for daemons/helpers
+/// that own no NSRunningApplication) and its CPU share (as reported by `ps`, a decaying average, so
+/// it can momentarily exceed 100 % across multiple cores).
 struct ProcessSample: Identifiable {
     let pid: Int
     let name: String
     let cpuPercent: Double
+    let icon: NSImage?
     var id: Int { pid }
 }
 

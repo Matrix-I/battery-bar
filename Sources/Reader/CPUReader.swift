@@ -17,6 +17,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 final class CPUReader: ObservableObject {
     @Published var info = CPUInfo()
@@ -159,10 +160,12 @@ final class CPUReader: ObservableObject {
         }
     }
 
-    /// The `count` heaviest processes by CPU, via `ps` sorted descending. `-c` prints the accounting
-    /// name (which may contain spaces), so pid + pcpu are the first two whitespace fields and the
-    /// name is the remainder. pid 0 (kernel_task) is skipped. Reuses DeviceTool.run for its timeout
-    /// and concurrent pipe draining.
+    /// The `count` heaviest processes by CPU, exactly as Stats.app reads them: `ps -o pcpu` sorted
+    /// descending. `pcpu` is a decaying average over up to a minute (per `man ps`), so the figures
+    /// match Stats' rather than jumping around like an instantaneous sample would. `-c` prints the
+    /// accounting name, but for GUI apps we prefer NSRunningApplication's localized name and icon (so
+    /// it reads "Google Chrome" with its icon, not a truncated "Google Chrome H") — again like Stats.
+    /// pid 0 is skipped.
     private static func readTopProcesses(_ count: Int) -> [ProcessSample] {
         guard let data = DeviceTool.run("/bin/ps", ["-A", "-c", "-o", "pid=,pcpu=,comm=", "-r"]),
               let out = String(data: data, encoding: .utf8) else { return [] }
@@ -170,11 +173,21 @@ final class CPUReader: ObservableObject {
         for line in out.split(separator: "\n") {
             let parts = line.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 3, let pid = Int(parts[0]), let cpu = Double(parts[1]), pid != 0 else { continue }
-            let name = parts[2...].joined(separator: " ")
-            result.append(ProcessSample(pid: pid, name: name, cpuPercent: cpu))
+            let comm = parts[2...].joined(separator: " ")
+            let (name, icon) = appIdentity(pid: pid, fallback: comm)
+            result.append(ProcessSample(pid: pid, name: name, cpuPercent: cpu, icon: icon))
             if result.count >= count { break }
         }
         return result
+    }
+
+    /// A GUI application's localized name and icon (e.g. "Google Chrome" + its icon) when the PID
+    /// owns an NSRunningApplication; otherwise the `ps` accounting name and no icon, for the
+    /// daemons/helpers that have none (the view draws a generic placeholder for those).
+    private static func appIdentity(pid: Int, fallback comm: String) -> (name: String, icon: NSImage?) {
+        guard let app = NSRunningApplication(processIdentifier: pid_t(pid)) else { return (comm, nil) }
+        let name = app.localizedName.flatMap { $0.isEmpty ? nil : $0 } ?? comm
+        return (name, app.icon)
     }
 
     // MARK: - Sampling
