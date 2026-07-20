@@ -73,6 +73,13 @@ final class CPUReader: ObservableObject {
         out.performanceCoreCount = pCoreCount
         out.uptimeSeconds = Self.uptime()
 
+        var loads = [Double](repeating: 0, count: 3)
+        if getloadavg(&loads, 3) == 3 {
+            out.loadAverage1 = loads[0]
+            out.loadAverage5 = loads[1]
+            out.loadAverage15 = loads[2]
+        }
+
         if let prev = prevTicks, prev.count == cur.count {
             let U = Int(CPU_STATE_USER), S = Int(CPU_STATE_SYSTEM), I = Int(CPU_STATE_IDLE), N = Int(CPU_STATE_NICE)
             var sumUser = 0.0, sumSys = 0.0, sumIdle = 0.0, sumTotal = 0.0
