@@ -46,6 +46,12 @@ struct CPUInfo {
     // The heaviest CPU consumers right now (from `ps`, refreshed a little slower than the load).
     var topProcesses: [ProcessSample] = []
 
+    // Active-residency-weighted average clock speed (MHz) per cluster, from IOReport. nil when the
+    // private framework / DVFS tables aren't available (e.g. Intel, or a future macOS).
+    var allFrequencyMHz: Double? = nil
+    var efficiencyFrequencyMHz: Double? = nil
+    var performanceFrequencyMHz: Double? = nil
+
     /// The figure shown in the usage ring and menu bar: everything that isn't idle.
     var usagePercent: Double { max(0, min(100, 100 - idlePercent)) }
 }

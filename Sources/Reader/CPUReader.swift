@@ -25,6 +25,8 @@ final class CPUReader: ObservableObject {
     private var interval: TimeInterval = 0
     private var panelOpen = false
     private let smc = SMC()
+    private let frequency = CPUFrequency()
+    private var cachedFreq: CPUFrequency.Reading? = nil
 
     // Previous per-core [user, system, idle, nice] tick counts, for the delta computation.
     private var prevTicks: [[UInt32]]? = nil
@@ -133,6 +135,13 @@ final class CPUReader: ObservableObject {
         // Top processes — also popover-only; publish the last list we have.
         if panelOpen { maybeReadTopProcesses() }
         out.topProcesses = cachedTop
+
+        // Frequency (IOReport) — popover-only; the first sample after opening primes the baseline
+        // and returns nil, so the value lands one tick later. Keep the last reading meanwhile.
+        if panelOpen, frequency.isAvailable, let r = frequency.sample() { cachedFreq = r }
+        out.allFrequencyMHz = cachedFreq?.allMHz
+        out.efficiencyFrequencyMHz = cachedFreq?.efficiencyMHz
+        out.performanceFrequencyMHz = cachedFreq?.performanceMHz
 
         info = out
     }

@@ -38,6 +38,8 @@ struct CPUDetailView: View {
 
             averageLoad
 
+            frequency
+
             topProcesses
 
             Divider()
@@ -146,6 +148,27 @@ struct CPUDetailView: View {
     }
 
     private func load(_ v: Double) -> String { String(format: "%.2f", v) }
+
+    // MARK: Frequency
+
+    @ViewBuilder
+    private var frequency: some View {
+        // Only render when IOReport gave us a reading (nil on Intel / unsupported macOS).
+        if let all = info.allFrequencyMHz {
+            SectionCaption("FREQUENCY")
+            VStack(spacing: 6) {
+                InfoRow(label: "All cores", value: mhz(all))
+                if let eff = info.efficiencyFrequencyMHz {
+                    CPUStatRow(color: CPUPalette.efficiency, label: "Efficiency cores", value: mhz(eff))
+                }
+                if let perf = info.performanceFrequencyMHz {
+                    CPUStatRow(color: CPUPalette.performance, label: "Performance cores", value: mhz(perf))
+                }
+            }
+        }
+    }
+
+    private func mhz(_ v: Double) -> String { "\(Int(v.rounded())) MHz" }
 
     // MARK: Top processes
 
