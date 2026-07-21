@@ -4,6 +4,18 @@
 // level comes from kern.memorystatus_vm_pressure_level, set by MemoryReader.
 
 import Foundation
+import AppKit
+
+/// One row of the RAM tab's TOP PROCESSES table: a process's display name, app icon (nil for
+/// daemons/helpers that own no NSRunningApplication) and its resident memory in bytes (from `ps rss`,
+/// resident set size — a close, no-privilege proxy for Activity Monitor's "Memory" column).
+struct MemoryProcess: Identifiable {
+    let pid: Int
+    let name: String
+    let bytes: UInt64
+    let icon: NSImage?
+    var id: Int { pid }
+}
 
 /// macOS memory-pressure level, from `kern.memorystatus_vm_pressure_level` — the same signal that
 /// drives Activity Monitor's green / yellow / red pressure graph.
@@ -26,6 +38,9 @@ struct MemoryInfo {
     var compressed: UInt64 = 0   // bytes — held by the VM compressor
     var swapUsed: UInt64 = 0     // bytes — swap in use
     var pressure: MemoryPressure = .normal   // authoritative macOS pressure level (set by the reader)
+
+    // The heaviest memory consumers right now (from `ps`, popover-only — see MemoryReader).
+    var topProcesses: [MemoryProcess] = []
 
     // Memory Used = App + Wired + Compressed (Activity Monitor's definition). Plain `+`: these are
     // three fractions of physical RAM, so the sum can't come near UInt64's ceiling — and were that

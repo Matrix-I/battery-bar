@@ -15,9 +15,20 @@ final class MemoryReader: ObservableObject {
 
     private var timer: Timer?
     private var interval: TimeInterval = 0
+    private var panelOpen = false
 
     private static let idleInterval: TimeInterval = 2   // menu-bar % only
     private static let activeInterval: TimeInterval = 1 // live readout while the panel is open
+
+    // Top-processes list: read via `ps` on a background queue (it blocks briefly), at most every
+    // `topInterval`, only while the panel is open. Cached so the 1 Hz path can republish it without
+    // re-running ps. All touched on the main thread except the read itself. Mirrors CPUReader.
+    private var cachedTop: [MemoryProcess] = []
+    private var topReadInFlight = false
+    private var lastTopRead = Date.distantPast
+    private let topQueue = DispatchQueue(label: "MemoryReader.top", qos: .utility)
+    private static let topInterval: TimeInterval = 2
+    private static let topCount = 6
 
     init() {
         refresh()
@@ -37,6 +48,7 @@ final class MemoryReader: ObservableObject {
     /// Poll once a second while the panel is visible; drop back to the lazy menu-bar-only cadence
     /// when it closes.
     func setPanelOpen(_ open: Bool) {
+        panelOpen = open
         schedule(open ? Self.activeInterval : Self.idleInterval)
         if open { refresh() }
     }
@@ -44,7 +56,50 @@ final class MemoryReader: ObservableObject {
     func refresh() {
         guard var out = MemoryStats.read() else { return }
         out.pressure = Self.pressureLevel()
+
+        // Top memory consumers — popover-only (a ps spawn); publish the last list we have.
+        if panelOpen { maybeReadTopProcesses() }
+        out.topProcesses = cachedTop
+
         info = out
+    }
+
+    /// Refresh the top-processes list at most every `topInterval`, off the main thread (ps blocks
+    /// briefly). Mirrors CPUReader's cached, gated read.
+    private func maybeReadTopProcesses() {
+        guard !topReadInFlight, Date().timeIntervalSince(lastTopRead) >= Self.topInterval else { return }
+        topReadInFlight = true
+        topQueue.async { [weak self] in
+            let procs = Self.readTopProcesses(Self.topCount)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.lastTopRead = Date()
+                self.topReadInFlight = false
+                self.cachedTop = procs
+                // Republish right away so the list appears promptly on first open, not one tick later.
+                var cur = self.info
+                cur.topProcesses = procs
+                self.info = cur
+            }
+        }
+    }
+
+    /// The `count` heaviest processes by resident memory: `ps -o rss` (KiB) sorted with `-m`
+    /// (descending by memory). Like CPUReader's list, GUI apps get their NSRunningApplication name +
+    /// icon via ProcessList. pid 0 is skipped.
+    private static func readTopProcesses(_ count: Int) -> [MemoryProcess] {
+        guard let data = DeviceTool.run("/bin/ps", ["-A", "-c", "-o", "pid=,rss=,comm=", "-m"]),
+              let out = String(data: data, encoding: .utf8) else { return [] }
+        var result: [MemoryProcess] = []
+        for line in out.split(separator: "\n") {
+            let parts = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard parts.count >= 3, let pid = Int(parts[0]), let rssKB = UInt64(parts[1]), pid != 0 else { continue }
+            let comm = parts[2...].joined(separator: " ")
+            let (name, icon) = ProcessList.identity(pid: pid, fallback: comm)
+            result.append(MemoryProcess(pid: pid, name: name, bytes: rssKB * 1024, icon: icon))
+            if result.count >= count { break }
+        }
+        return result
     }
 
     /// The macOS memory-pressure level. The sysctl returns the dispatch-source constants

@@ -24,6 +24,13 @@ func fmtGB(_ bytes: UInt64) -> String {
     String(format: "%.2f GB", Double(bytes) / 1_073_741_824)
 }
 
+/// Bytes → "2.82 GB" / "843 MB" for the per-process memory column, using binary units (like the
+/// rest of the RAM tab). GB with two decimals once it reaches a gibibyte; whole mebibytes below.
+func fmtProcessMemory(_ bytes: UInt64) -> String {
+    let mib = Double(bytes) / 1_048_576
+    return mib >= 1024 ? String(format: "%.2f GB", mib / 1024) : String(format: "%.0f MB", mib)
+}
+
 /// Bytes → "55.8 MB" using decimal units (÷1000), matching how macOS reports network data transfer
 /// (bytes, KB, MB, GB, TB). Kept separate from fmtGB, which uses binary GiB for RAM.
 func fmtBytes(_ bytes: UInt64) -> String {

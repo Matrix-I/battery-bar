@@ -34,6 +34,8 @@ struct MemoryDetailView: View {
 
             details
 
+            topProcesses
+
             Divider()
 
             HStack {
@@ -145,6 +147,25 @@ struct MemoryDetailView: View {
             MemoryLegendRow(color: Self.compressedColor, label: "Compressed", value: fmtGB(info.compressed))
             MemoryLegendRow(color: Self.freeColor, label: "Free", value: fmtGB(info.free))
             InfoRow(label: "Swap", value: fmtGB(info.swapUsed))
+        }
+    }
+
+    // MARK: Top processes
+
+    @ViewBuilder
+    private var topProcesses: some View {
+        SectionCaption("TOP PROCESSES")
+        if info.topProcesses.isEmpty {
+            Text("Reading…")
+                .font(.caption2).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(spacing: 6) {
+                ProcessTableHeader()
+                ForEach(info.topProcesses) { p in
+                    ProcessRow(icon: p.icon, name: p.name, value: fmtProcessMemory(p.bytes))
+                }
+            }
         }
     }
 }
