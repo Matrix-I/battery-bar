@@ -60,23 +60,24 @@ struct CPUDetailView: View {
     @ViewBuilder
     private var rings: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 28) {
-                usageRing
-                temperatureRing
-            }
-            .frame(maxWidth: .infinity)
-
             if let subtitle = chipSubtitle {
                 Text(subtitle)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 8)
             }
+
+            HStack(spacing: 28) {
+                usageRing
+                temperatureRing
+            }
+            .frame(maxWidth: .infinity)
         }
         .padding(.vertical, 6)
     }
 
-    /// The chip identity shown under the rings — its marketing name plus the core split, e.g.
+    /// The chip identity shown above the rings — its marketing name plus the core split, e.g.
     /// "Apple M1 Pro (2E/6P)". The (…E/…P) suffix only appears on chips that report both cluster
     /// counts (Apple Silicon); an Intel Mac shows just the brand string.
     private var chipSubtitle: String? {
@@ -97,7 +98,7 @@ struct CPUDetailView: View {
             }
             .frame(width: 86, height: 86)
 
-            Text("Usage").font(.caption).foregroundStyle(.secondary)
+            Text("Usage").font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
         }
     }
 
@@ -118,7 +119,7 @@ struct CPUDetailView: View {
             }
             .frame(width: 86, height: 86)
 
-            Text("Temperature").font(.caption).foregroundStyle(.secondary)
+            Text("Temperature").font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
         }
     }
 

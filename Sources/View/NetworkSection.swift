@@ -240,7 +240,7 @@ private struct NetRatePillar: View {
             }
             HStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 10, height: 10)
-                Text(label).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(label).font(.system(size: 12)).foregroundStyle(.white)
             }
         }
         .frame(maxWidth: .infinity)
