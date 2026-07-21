@@ -75,8 +75,15 @@ PLIST
 # Certificate… → Name "StatsBar Local", Identity Type "Self Signed Root", Certificate Type
 # "Code Signing". Then either `export STATSBAR_SIGN_IDENTITY="StatsBar Local"` or just name it
 # that (the default below). Without a matching identity we fall back to ad-hoc (re-prompts remain).
+#
+# NOTE: we look the identity up WITHOUT `find-identity -v`. A self-signed cert isn't trusted as a
+# root, so the `-v` (valid) filter hides it — but codesign signs with it fine anyway (signing needs
+# the private key, not a trusted chain), and TCC keys permissions to the cert hash regardless of
+# trust. So requiring `-v` here would needlessly fall back to ad-hoc for exactly the self-signed
+# local cert this is meant to use. We still confirm a private key exists (an identity, not a bare
+# cert) by matching the numbered "N) <hash> "<name>"" identity line.
 SIGN_IDENTITY="${STATSBAR_SIGN_IDENTITY:-StatsBar Local}"
-if security find-identity -v -p codesigning 2>/dev/null | grep -qF "$SIGN_IDENTITY"; then
+if security find-identity -p codesigning 2>/dev/null | grep -qF "\"$SIGN_IDENTITY\""; then
     echo "🔏 Signing with stable identity: $SIGN_IDENTITY (permissions persist across upgrades)"
     codesign --force --deep -s "$SIGN_IDENTITY" "$APP.app"
 else
