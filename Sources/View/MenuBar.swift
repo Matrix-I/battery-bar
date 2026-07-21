@@ -103,11 +103,11 @@ func batteryMenuBarImage(level: Double, charging: Bool, percent: Int? = nil) -> 
 /// single NSImage (right-aligned, two lines). Baking it — rather than a SwiftUI VStack — gives a
 /// compact, predictable two-line layout.
 ///
-/// The canvas width is FIXED (sized to the widest label the formatter can produce, with monospaced
-/// digits so a reference string bounds every real value). This is important: the status item's
-/// width tracks the image, and a width that changed with every rate update would resize the item —
-/// dragging an open popover sideways as the number changed. The two lines right-align inside this
-/// fixed width, so the digits grow leftward while the right edge stays put.
+/// The canvas is sized to the actual two lines so the item sits snug against its content, like the
+/// CPU/RAM items — no reserved slack for a hypothetical maximum rate. Monospaced digits keep the two
+/// lines aligned and mean the width only shifts when the rate's digit-count changes (e.g. "9 KB/s" →
+/// "12 KB/s"), not on every update. The two lines right-align, so the shorter one's right edge lines
+/// up with the other.
 ///
 /// The up arrow is red and the down arrow blue, matching the Total upload / download markers in the
 /// popover. A coloured menu-bar image can't be a template (templates render monochrome), so the
@@ -130,9 +130,9 @@ func networkMenuBarImage(up: Double, down: Double) -> NSImage {
     let upLine = line(arrow: "↑", arrowColor: .systemRed, rate: menuBarRate(up))
     let downLine = line(arrow: "↓", arrowColor: .systemBlue, rate: menuBarRate(down))
     let lineH = ceil(max(upLine.size().height, downLine.size().height))
-    // Widest possible label ("↕ 999.9 MB/s"): "%.1f MB/s" is the longest form the formatter emits,
-    // and monospaced digits mean no real value can be wider than this reference.
-    let w = ceil(NSAttributedString(string: "↕ 999.9 MB/s", attributes: [.font: font]).size().width)
+    // Snug width: just the wider of the two actual lines, so the item hugs its content instead of
+    // reserving space for a maximum rate that never shows.
+    let w = ceil(max(upLine.size().width, downLine.size().width))
     let h = lineH * 2
 
     let img = NSImage(size: NSSize(width: max(w, 1), height: h), flipped: false) { _ in
