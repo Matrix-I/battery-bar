@@ -175,21 +175,6 @@ struct CPUDetailView: View {
 
     // MARK: Top processes
 
-    private var iconSize: CGFloat { 16 }
-
-    /// The process's app icon, or a generic placeholder glyph for daemons/helpers that have none.
-    @ViewBuilder
-    private func processIcon(_ icon: NSImage?) -> some View {
-        if let icon {
-            Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-        } else {
-            Image(systemName: "gearshape.fill")
-                .resizable().aspectRatio(contentMode: .fit)
-                .foregroundStyle(.secondary)
-                .padding(1)
-        }
-    }
-
     @ViewBuilder
     private var topProcesses: some View {
         SectionCaption("TOP PROCESSES")
@@ -199,25 +184,10 @@ struct CPUDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             VStack(spacing: 6) {
-                HStack {
-                    Text("Process")
-                    Spacer()
-                    Text("Usage")
-                }
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
-                .padding(.leading, iconSize + 8)   // align the header with the names, past the icons
-
+                ProcessTableHeader()
                 ForEach(info.topProcesses) { p in
-                    HStack(spacing: 8) {
-                        processIcon(p.icon).frame(width: iconSize, height: iconSize)
-                        Text(p.name).lineLimit(1).truncationMode(.tail)
-                        Spacer(minLength: 8)
-                        Text(String(format: "%.1f%%", p.cpuPercent))
-                            .fontWeight(.medium).monospacedDigit()
-                    }
-                    .font(.system(size: 12))
+                    ProcessRow(icon: p.icon, name: p.name,
+                               value: String(format: "%.1f%%", p.cpuPercent))
                 }
             }
         }

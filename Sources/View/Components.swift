@@ -1,6 +1,7 @@
 // Components.swift — small reusable views shared across the detail panel sections.
 
 import SwiftUI
+import AppKit
 
 struct BarView: View {
     let pct: Double
@@ -110,5 +111,61 @@ struct InfoRow: View {
                 .lineLimit(1)
         }
         .font(.system(size: 12))
+    }
+}
+
+// MARK: - TOP PROCESSES table (shared by the CPU and RAM popovers)
+
+/// A process's app icon, or a generic placeholder glyph for the daemons/helpers that own none.
+struct ProcessIcon: View {
+    let icon: NSImage?
+
+    var body: some View {
+        if let icon {
+            Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "gearshape.fill")
+                .resizable().aspectRatio(contentMode: .fit)
+                .foregroundStyle(.secondary)
+                .padding(1)
+        }
+    }
+}
+
+/// One row of a TOP PROCESSES table: the app icon, the (truncating) process name, and a
+/// right-aligned value — a CPU % on the CPU tab, a memory size on the RAM tab.
+struct ProcessRow: View {
+    let icon: NSImage?
+    let name: String
+    let value: String
+
+    static let iconSize: CGFloat = 16
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProcessIcon(icon: icon).frame(width: Self.iconSize, height: Self.iconSize)
+            Text(name).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
+            Text(value).fontWeight(.medium).monospacedDigit()
+        }
+        .font(.system(size: 12))
+    }
+}
+
+/// The "Process / Usage" header above a TOP PROCESSES table, indented so the labels line up past
+/// the icon column.
+struct ProcessTableHeader: View {
+    var valueLabel: String = "Usage"
+
+    var body: some View {
+        HStack {
+            Text("Process")
+            Spacer()
+            Text(valueLabel)
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .tracking(0.5)
+        .foregroundStyle(.secondary)
+        .padding(.leading, ProcessRow.iconSize + 8)   // align the header with the names, past the icons
     }
 }

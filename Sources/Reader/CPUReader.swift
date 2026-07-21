@@ -177,20 +177,11 @@ final class CPUReader: ObservableObject {
             let parts = line.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 3, let pid = Int(parts[0]), let cpu = Double(parts[1]), pid != 0 else { continue }
             let comm = parts[2...].joined(separator: " ")
-            let (name, icon) = appIdentity(pid: pid, fallback: comm)
+            let (name, icon) = ProcessList.identity(pid: pid, fallback: comm)
             result.append(ProcessSample(pid: pid, name: name, cpuPercent: cpu, icon: icon))
             if result.count >= count { break }
         }
         return result
-    }
-
-    /// A GUI application's localized name and icon (e.g. "Google Chrome" + its icon) when the PID
-    /// owns an NSRunningApplication; otherwise the `ps` accounting name and no icon, for the
-    /// daemons/helpers that have none (the view draws a generic placeholder for those).
-    private static func appIdentity(pid: Int, fallback comm: String) -> (name: String, icon: NSImage?) {
-        guard let app = NSRunningApplication(processIdentifier: pid_t(pid)) else { return (comm, nil) }
-        let name = app.localizedName.flatMap { $0.isEmpty ? nil : $0 } ?? comm
-        return (name, app.icon)
     }
 
     // MARK: - Sampling
