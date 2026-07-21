@@ -37,9 +37,7 @@ enum MemoryStats {
         let appPages = Double(stats.internal_page_count) - Double(stats.purgeable_count)
         info.app = UInt64(max(0, appPages) * page)
 
-        var swap = xsw_usage()
-        var size = MemoryLayout<xsw_usage>.stride
-        if sysctlbyname("vm.swapusage", &swap, &size, nil, 0) == 0 {
+        if let swap: xsw_usage = Sysctl.value("vm.swapusage") {
             info.swapUsed = swap.xsu_used
         }
 

@@ -52,9 +52,9 @@ final class CPUReader: ObservableObject {
     private static let activeInterval: TimeInterval = 1 // live readout while the panel is open
 
     init() {
-        eCoreCount = Self.sysctlInt("hw.perflevel1.logicalcpu") ?? 0
-        pCoreCount = Self.sysctlInt("hw.perflevel0.logicalcpu") ?? 0
-        chipName = Self.sysctlString("machdep.cpu.brand_string")
+        eCoreCount = Sysctl.int("hw.perflevel1.logicalcpu") ?? 0
+        pCoreCount = Sysctl.int("hw.perflevel0.logicalcpu") ?? 0
+        chipName = Sysctl.string("machdep.cpu.brand_string")
         tempKeys = Self.discoverTemperatureKeys(smc)
 
         refresh()
@@ -87,7 +87,7 @@ final class CPUReader: ObservableObject {
         out.efficiencyCoreCount = eCoreCount
         out.performanceCoreCount = pCoreCount
         out.chipName = chipName
-        out.uptimeSeconds = Self.uptime()
+        out.uptimeSeconds = Sysctl.uptime()
 
         if let prev = prevTicks, prev.count == cur.count {
             let U = Int(CPU_STATE_USER), S = Int(CPU_STATE_SYSTEM), I = Int(CPU_STATE_IDLE), N = Int(CPU_STATE_NICE)
@@ -217,39 +217,5 @@ final class CPUReader: ObservableObject {
         if !apple.isEmpty { return apple.sorted() }
         let intel = ["TC0P", "TC0D", "TC0E", "TC0F", "TC0H", "TC1C", "TC2C", "TC3C", "TC4C", "TCXC", "TCAD"]
         return intel.filter { smc.readFloat($0) != nil }
-    }
-
-    // MARK: - sysctl helpers
-
-    private static func sysctlInt(_ name: String) -> Int? {
-        var size = 0
-        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-        if size == 4 {
-            var v: UInt32 = 0
-            guard sysctlbyname(name, &v, &size, nil, 0) == 0 else { return nil }
-            return Int(v)
-        }
-        var v = 0
-        var s = MemoryLayout<Int>.size
-        guard sysctlbyname(name, &v, &s, nil, 0) == 0 else { return nil }
-        return v
-    }
-
-    private static func sysctlString(_ name: String) -> String? {
-        var size = 0
-        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-        var buf = [CChar](repeating: 0, count: size)
-        guard sysctlbyname(name, &buf, &size, nil, 0) == 0 else { return nil }
-        let s = String(cString: buf)
-        return s.isEmpty ? nil : s
-    }
-
-    private static func uptime() -> Double {
-        var tv = timeval()
-        var size = MemoryLayout<timeval>.stride
-        var mib = [CTL_KERN, KERN_BOOTTIME]
-        guard sysctl(&mib, 2, &tv, &size, nil, 0) == 0, tv.tv_sec != 0 else { return 0 }
-        let boot = Double(tv.tv_sec) + Double(tv.tv_usec) / 1_000_000
-        return max(0, Date().timeIntervalSince1970 - boot)
     }
 }
