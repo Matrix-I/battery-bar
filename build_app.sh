@@ -53,6 +53,11 @@ cat > "$APP.app/Contents/Info.plist" <<'PLIST'
     <string>StatsBar shows the name of the Wi-Fi network you're connected to.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>StatsBar shows the name of the Wi-Fi network you're connected to.</string>
+    <!-- The Bluetooth item reads per-device battery levels via IOBluetoothDevice for accessories
+         (e.g. BLE mice) whose levels system_profiler doesn't report. macOS aborts the process on
+         first Bluetooth access unless this key is present, so it is mandatory. -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>StatsBar shows the battery level of your connected Bluetooth devices.</string>
 </dict>
 </plist>
 PLIST
