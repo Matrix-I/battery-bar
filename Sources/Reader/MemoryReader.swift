@@ -106,12 +106,7 @@ final class MemoryReader: ObservableObject {
     /// (1 = normal, 2 = warning, 4 = critical); a read failure or any unexpected value is treated as
     /// normal so the ring never falsely alarms.
     private static func pressureLevel() -> MemoryPressure {
-        var level: Int32 = 0
-        var size = MemoryLayout<Int32>.size
-        guard sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &size, nil, 0) == 0 else {
-            return .normal
-        }
-        switch level {
+        switch Sysctl.int("kern.memorystatus_vm_pressure_level") {
         case 4:  return .critical
         case 2:  return .warning
         default: return .normal
