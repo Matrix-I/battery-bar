@@ -13,8 +13,7 @@ import Combine
 final class MemoryReader: ObservableObject {
     @Published var info = MemoryInfo()
 
-    private var timer: Timer?
-    private var interval: TimeInterval = 0
+    private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
     private var panelOpen = false
 
     private static let idleInterval: TimeInterval = 2   // menu-bar % only
@@ -32,24 +31,14 @@ final class MemoryReader: ObservableObject {
 
     init() {
         refresh()
-        schedule(Self.idleInterval)
-    }
-
-    private func schedule(_ seconds: TimeInterval) {
-        guard seconds != interval else { return }
-        interval = seconds
-        timer?.invalidate()
-        // .common modes so the timer keeps firing while the popover's run loop is in event-tracking.
-        let t = Timer(timeInterval: seconds, repeats: true) { [weak self] _ in self?.refresh() }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        poll.schedule(every: Self.idleInterval)
     }
 
     /// Poll once a second while the panel is visible; drop back to the lazy menu-bar-only cadence
     /// when it closes.
     func setPanelOpen(_ open: Bool) {
         panelOpen = open
-        schedule(open ? Self.activeInterval : Self.idleInterval)
+        poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
         if open { refresh() }
     }
 

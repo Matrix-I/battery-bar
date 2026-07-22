@@ -28,7 +28,7 @@ final class AndroidDeviceReader: ObservableObject {
     @Published var statusMessage: String?
 
     private var isBusy = false
-    private var timer: Timer?
+    private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
 
     private var lastGood: [AndroidDeviceInfo] = []
     private var lastGoodAt: Date?
@@ -45,11 +45,7 @@ final class AndroidDeviceReader: ObservableObject {
 
     init() {
         refresh()
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        poll.schedule(every: 1)
     }
 
     func refresh() {

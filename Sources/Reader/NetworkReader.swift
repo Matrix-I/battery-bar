@@ -27,7 +27,7 @@ final class NetworkReader: NSObject, ObservableObject {
     private var isPinging = false
     private var isFetchingPublicIP = false
     private var panelOpen = false
-    private var timer: Timer?
+    private lazy var poll = PollingTimer { [weak self] in self?.tick() }
 
     // Session throughput: baseline is the counter value at launch/interface-switch; last* + lastSampleTime
     // drive the per-second rate. Keyed by BSD name so plugging into Ethernet resets cleanly.
@@ -57,10 +57,8 @@ final class NetworkReader: NSObject, ObservableObject {
 
         // Same rationale as the other readers: MenuBarExtra(.window) builds the view once and just
         // shows/hides it, so .onAppear won't refire — a timer is how we keep the tab live. Ticks are
-        // no-ops while the popover is closed. .common mode keeps it firing during event tracking.
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        // no-ops while the popover is closed.
+        poll.schedule(every: 1)
     }
 
     /// Called by the popover's visibility reporter. Opening kicks an immediate full refresh so the

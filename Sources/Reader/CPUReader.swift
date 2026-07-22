@@ -22,8 +22,7 @@ import AppKit
 final class CPUReader: ObservableObject {
     @Published var info = CPUInfo()
 
-    private var timer: Timer?
-    private var interval: TimeInterval = 0
+    private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
     private var panelOpen = false
     private let smc = SMC()
     private let frequency = CPUFrequency()
@@ -58,24 +57,14 @@ final class CPUReader: ObservableObject {
         tempKeys = Self.discoverTemperatureKeys(smc)
 
         refresh()
-        schedule(Self.idleInterval)
-    }
-
-    private func schedule(_ seconds: TimeInterval) {
-        guard seconds != interval else { return }
-        interval = seconds
-        timer?.invalidate()
-        // .common modes so the timer keeps firing while the popover's run loop is in event-tracking.
-        let t = Timer(timeInterval: seconds, repeats: true) { [weak self] _ in self?.refresh() }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        poll.schedule(every: Self.idleInterval)
     }
 
     /// Poll once a second while the panel is visible (and read temperature); drop back to the lazy
     /// menu-bar-only cadence when it closes.
     func setPanelOpen(_ open: Bool) {
         panelOpen = open
-        schedule(open ? Self.activeInterval : Self.idleInterval)
+        poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
         if open { refresh() }
     }
 
