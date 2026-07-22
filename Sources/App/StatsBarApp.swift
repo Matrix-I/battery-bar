@@ -229,6 +229,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for p in allPopovers where p.isShown { p.performClose(nil) }
     }
 
+    /// The reader behind a metric's menu-bar item, so refreshLabels can forward item visibility to it.
+    /// Bluetooth's glyph is static (no live data on the menu bar), so it uses MetricReader's default
+    /// no-op — its polling is already driven purely by its popover.
+    private func metricReader(for metric: StatMetric) -> any MetricReader {
+        switch metric {
+        case .battery:   return batteryReader
+        case .cpu:       return cpuReader
+        case .memory:    return memoryReader
+        case .network:   return networkReader
+        case .bluetooth: return bluetoothReader
+        }
+    }
+
     private func refreshLabels() {
         // Per-item visibility + live glyphs, driven off the Control Center's "show<Item>Item" toggles.
         // Read the visibility flag the same lenient way as the battery glyph flags (absent key ⇒
@@ -244,6 +257,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let m = metricItems[metric] else { continue }
             let visible = UserDefaults.standard.object(forKey: m.visibilityKey) as? Bool ?? true
             m.statusItem.isVisible = visible
+            // Let the reader stop polling when its item is hidden (and its popover closed): with
+            // nothing on screen there's no reason to keep reading. Idempotent — the reader no-ops when
+            // the flag is unchanged — so calling it every ~1 Hz tick is cheap.
+            metricReader(for: metric).setItemVisible(visible)
             // A hidden item draws nothing — skip its glyph work entirely (no wasted CG render for a
             // button nobody sees). A static-glyph item (glyph == nil, i.e. Bluetooth) had its image
             // set once at creation. Otherwise probe the cheap key and re-render + reassign only when

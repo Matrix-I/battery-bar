@@ -23,7 +23,13 @@ final class CPUReader: ObservableObject {
     @Published var info = CPUInfo()
 
     private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
+    // "Is anyone looking?" — the detail popover is open, or the CPU menu-bar item is visible. With
+    // neither, nothing shows the data, so the reader stops polling (see applyCadence). itemVisible
+    // defaults true to match AppDelegate's lenient "absent key ⇒ shown" default; `polling` tracks
+    // whether the timer is currently running so a resume-from-stop can re-prime the delta baseline.
     private var panelOpen = false
+    private var itemVisible = true
+    private var polling = false
     private let smc = SMC.shared
     private let frequency = CPUFrequency()
     private var cachedFreq: CPUFrequency.Reading? = nil
@@ -53,24 +59,48 @@ final class CPUReader: ObservableObject {
         chipName = Sysctl.string("machdep.cpu.brand_string")
         tempKeys = Self.discoverTemperatureKeys(smc)
 
-        refresh()
-        poll.schedule(every: Self.idleInterval)
+        applyCadence()   // start the idle poll (item visible by default) and mark `polling`
+        refresh()        // prime the per-core tick baseline
     }
 
-    /// Poll once a second while the panel is visible (and read temperature); drop back to the lazy
-    /// menu-bar-only cadence when it closes.
+    /// Poll fast while the panel is visible (and read temperature); drop to the lazy menu-bar-only
+    /// cadence when it closes, or stop entirely if the menu-bar item is also hidden (see applyCadence).
     func setPanelOpen(_ open: Bool) {
         panelOpen = open
-        poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
+        applyCadence()
         if open {
-            // Sampling paused while closed, so the baseline is stale — re-prime it so the first
-            // reading covers ~1s, not the whole time the popover was shut (see resetBaseline).
+            // The IOReport frequency baseline is stale between popover sessions (it only samples while
+            // open), so re-prime it so the first reading covers ~1s, not the whole gap (resetBaseline).
             frequency.resetBaseline()
             refresh()
         }
     }
 
+    /// Driven by AppDelegate off the "showCPUItem" toggle. When the item is hidden and the popover is
+    /// closed, nothing shows the CPU — stop reading; when it's shown again, repaint now.
+    func setItemVisible(_ visible: Bool) {
+        guard visible != itemVisible else { return }
+        itemVisible = visible
+        applyCadence()
+        if visible && !panelOpen { refresh() }
+    }
+
+    /// Poll cadence from the two visibility signals: fast in the popover, lazy for the menu-bar glyph
+    /// alone, stopped when neither shows the data. Resuming after a full stop clears the usage-delta
+    /// baseline (tick sampling paused, so it's stale), so the first reading re-primes rather than
+    /// averaging over the whole idle gap.
+    private func applyCadence() {
+        let shouldPoll = panelOpen || itemVisible
+        if shouldPoll && !polling { prevTicks = nil }
+        polling = shouldPoll
+        if panelOpen { poll.schedule(every: Self.activeInterval) }
+        else if itemVisible { poll.schedule(every: Self.idleInterval) }
+        else { poll.stop() }
+    }
+
     func refresh() {
+        // Nothing displays the CPU when the popover is closed and the item is hidden — skip the read.
+        guard panelOpen || itemVisible else { return }
         guard let cur = sampleTicks() else { return }
 
         var out = CPUInfo()

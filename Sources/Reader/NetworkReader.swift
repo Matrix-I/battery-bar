@@ -1,9 +1,8 @@
 // NetworkReader.swift — the ObservableObject behind the Network tab. It owns one NetworkInfo and
-// keeps it fresh from three cadences. The ping and outbound lookup are gated on the popover being
-// open so nothing runs while nobody's looking; the local read also runs when the Network menu-bar
-// item is visible (its glyph shows the live rate), and drops to a slow keep-warm when neither holds:
+// keeps it fresh from three cadences. It polls only while the rate is shown — the popover is open, or
+// the Network menu-bar item is visible — and stops entirely otherwise; the ping and public-IP lookup
+// additionally only run while the popover is open:
 //   • ~1 Hz  local reads   — interface, addresses, DNS, Wi-Fi radio, byte counters → totals + rates
-//                            (keep-warm every ~10 s when the rate is off-screen — see tick())
 //   • ~3 s   latency ping   — a short ICMP burst to a public host → latency / jitter / reachability
 //   • ~5 min public IP      — only if the user leaves "Show public IP" on; the sole outbound call
 //
@@ -28,7 +27,11 @@ final class NetworkReader: NSObject, ObservableObject {
     private var isBusy = false
     private var isPinging = false
     private var isFetchingPublicIP = false
+    // "Is anyone looking?" — the detail popover is open, or the Network menu-bar item is visible (its
+    // glyph shows the live rate). With neither, nothing shows the rate, so the reader stops polling
+    // (see applyCadence). itemVisible defaults true to match AppDelegate's lenient "absent ⇒ shown".
     private var panelOpen = false
+    private var itemVisible = true
     private lazy var poll = PollingTimer { [weak self] in self?.tick() }
 
     // Session throughput: baseline is the counter value at launch/interface-switch; last* + lastSampleTime
@@ -42,11 +45,9 @@ final class NetworkReader: NSObject, ObservableObject {
 
     private var lastPingAt: DispatchTime?
     private var lastPublicIPAt: DispatchTime?
-    private var lastLocalReadAt: DispatchTime?
 
     private static let pingInterval: TimeInterval = 3
     private static let publicIPInterval: TimeInterval = 300
-    private static let idleInterval: TimeInterval = 10   // keep-warm cadence when the rate is off-screen
     private static let pingHost = "1.1.1.1"
     private static let pingHostV6 = "2606:4700:4700::1111"   // Cloudflare — fallback on IPv6-only links
 
@@ -61,16 +62,33 @@ final class NetworkReader: NSObject, ObservableObject {
         primeBaseline()
 
         // Same rationale as the other readers: MenuBarExtra(.window) builds the view once and just
-        // shows/hides it, so .onAppear won't refire — a timer is how we keep the tab live. Ticks are
-        // no-ops while the popover is closed.
-        poll.schedule(every: 1)
+        // shows/hides it, so .onAppear won't refire — a timer is how we keep the tab live. It runs at
+        // 1 Hz while the rate is shown and is stopped otherwise (see applyCadence).
+        applyCadence()
     }
 
     /// Called by the popover's visibility reporter. Opening kicks an immediate full refresh so the
-    /// tab isn't blank on first paint; closing just parks the timer's work.
+    /// tab isn't blank on first paint; closing parks the timer (unless the menu-bar item keeps it live).
     func setPanelOpen(_ open: Bool) {
         panelOpen = open
+        applyCadence()
         if open { refresh() }
+    }
+
+    /// Driven by AppDelegate off the "showNetworkItem" toggle. When the item is hidden and the popover
+    /// is closed, nobody sees the rate — stop polling; when it's shown again, the resumed 1 Hz tick
+    /// repaints the rate within a second (no forced read here, which would also fire the popover-only
+    /// ping / public-IP lookup).
+    func setItemVisible(_ visible: Bool) {
+        guard visible != itemVisible else { return }
+        itemVisible = visible
+        applyCadence()
+    }
+
+    /// Poll at 1 Hz whenever the rate is shown (popover open, or the menu-bar item visible); stop
+    /// entirely when neither holds.
+    private func applyCadence() {
+        if panelOpen || itemVisible { poll.schedule(every: 1) } else { poll.stop() }
     }
 
     /// A full, forced refresh across all three cadences — used on open and by the Refresh button.
@@ -91,21 +109,11 @@ final class NetworkReader: NSObject, ObservableObject {
     // MARK: Cadences
 
     private func tick() {
-        // The local read (byte counters) drives the menu-bar up/down rate, so it's only worth running
-        // every second when that rate is actually on screen: the popover is open, or the Network
-        // menu-bar item is visible. When neither holds nobody can see the rate, so drop to a slow
-        // keep-warm instead of an SCDynamicStore + sysctl gather every second. It's the light counters
-        // read when the popover is closed, and the full interface/Wi-Fi/DNS read when it's open. The
-        // ping and the outbound public-IP lookup only matter inside the popover, so they stay gated.
-        // (Absent key ⇒ item shown, matching AppDelegate.refreshLabels' lenient default.)
-        let itemVisible = UserDefaults.standard.object(forKey: "showNetworkItem") as? Bool ?? true
-        if panelOpen || itemVisible {
-            fastRefresh(full: panelOpen)
-            lastLocalReadAt = DispatchTime.now()
-        } else if elapsed(since: lastLocalReadAt, exceeds: Self.idleInterval) {
-            fastRefresh(full: false)
-            lastLocalReadAt = DispatchTime.now()
-        }
+        // The timer only runs while the rate is shown (see applyCadence), so no visibility check here.
+        // The local counter read drives the menu-bar rate — light (counters only) while the popover is
+        // closed, the full interface/Wi-Fi/DNS read when it's open. The ping and the outbound public-IP
+        // lookup only matter inside the popover, so they stay gated on panelOpen.
+        fastRefresh(full: panelOpen)
         guard panelOpen else { return }
         maybePing(force: false)
         maybePublicIP(force: false)
