@@ -8,8 +8,7 @@ import IOKit
 
 final class BatteryReader: ObservableObject {
     @Published var info = BatteryInfo()
-    private var timer: Timer?
-    private var interval: TimeInterval = 0
+    private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
     private let smc = SMC()
 
     // "Maximum Capacity" (macOS's own battery-health figure — System Information / Battery Health)
@@ -28,26 +27,12 @@ final class BatteryReader: ObservableObject {
 
     init() {
         refresh()
-        schedule(Self.idleInterval)
-    }
-
-    private func schedule(_ seconds: TimeInterval) {
-        guard seconds != interval else { return }
-        interval = seconds
-        timer?.invalidate()
-        // Register in .common modes, not the implicit .default of scheduledTimer: while the
-        // menu-bar popover is up the run loop can sit in event-tracking mode, where a
-        // .default-only timer never fires — that's what makes the "live" readout freeze.
-        let t = Timer(timeInterval: seconds, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        poll.schedule(every: Self.idleInterval)
     }
 
     /// Poll once a second while the detail panel is visible; drop back to the lazy cadence when it closes.
     func setPanelOpen(_ open: Bool) {
-        schedule(open ? Self.activeInterval : Self.idleInterval)
+        poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
         if open { refresh() }
     }
 

@@ -13,7 +13,7 @@ final class IOSDeviceReader: ObservableObject {
 
     /// Only accessed/mutated on the main thread — refresh() is always called from main (button, onAppear, timer).
     private var isBusy = false
-    private var timer: Timer?
+    private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
 
     /// Warns (macOS notification) when a device's battery runs hot. Touched only on the main thread,
     /// inside publish, so its threshold-crossing state stays single-threaded.
@@ -40,12 +40,7 @@ final class IOSDeviceReader: ObservableObject {
         // Poll every second like the Mac reader. Each tick shells out to libimobiledevice (a few
         // subprocesses + USB round-trips), but refresh()'s isBusy guard drops any tick that lands
         // while the previous read is still running, so a slow cycle just lowers the effective rate.
-        // .common mode keeps it firing while the menu-bar popover is up (event-tracking run-loop mode).
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        poll.schedule(every: 1)
     }
 
     func refresh() {

@@ -69,8 +69,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Refreshes the live status-item glyphs ~1 Hz (cheap to rebuild; the readers update at that rate
-    /// anyway). Also the hook for menu-bar toggle changes to take effect within a second.
-    private var labelTimer: Timer?
+    /// anyway). Also the hook for menu-bar toggle changes to take effect within a second. assumeIsolated
+    /// is safe because PollingTimer fires on RunLoop.main, so the closure always runs on the main thread.
+    private lazy var labelPoll = PollingTimer { [weak self] in
+        MainActor.assumeIsolated { self?.refreshLabels() }
+    }
     /// Fires on clicks outside the app so an open popover dismisses like a normal menu-bar popover.
     private var outsideClickMonitor: Any?
 
@@ -115,13 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   staticImage: bluetoothMenuBarImage())
 
         refreshLabels()
-        // The timer is added to RunLoop.main below, so its closure always fires on the main thread —
-        // assert that to the compiler so the @MainActor refreshLabels() call is warning-free.
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshLabels() }
-        }
-        RunLoop.main.add(t, forMode: .common)
-        labelTimer = t
+        labelPoll.schedule(every: 1)
 
         // A global monitor sees only clicks in OTHER apps / the desktop, never our own popover's
         // interior or our status buttons — exactly the "clicked away" case that should dismiss.

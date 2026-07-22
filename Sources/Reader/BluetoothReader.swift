@@ -21,7 +21,7 @@ import Combine
 final class BluetoothReader: ObservableObject {
     @Published var info = BluetoothInfo()
 
-    private var timer: Timer?
+    private lazy var poll = PollingTimer { [weak self] in self?.maybeRead() }
     private var panelOpen = false
 
     /// The last system_profiler parse, before the GATT overlay — so a GATT update re-merges onto the
@@ -53,12 +53,9 @@ final class BluetoothReader: ObservableObject {
         if open {
             maybeRead(force: true)
             gatt.refresh()
-            let t = Timer(timeInterval: Self.interval, repeats: true) { [weak self] _ in self?.maybeRead() }
-            RunLoop.main.add(t, forMode: .common)
-            timer = t
+            poll.schedule(every: Self.interval)
         } else {
-            timer?.invalidate()
-            timer = nil
+            poll.stop()
         }
     }
 
