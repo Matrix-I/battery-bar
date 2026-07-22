@@ -11,6 +11,17 @@ protocol MetricReader: AnyObject {
     func refresh()
     /// Tell the reader whether its detail popover is visible, so it can pick a polling cadence.
     func setPanelOpen(_ open: Bool)
+    /// Tell the reader whether its live menu-bar glyph is currently shown. Together with setPanelOpen
+    /// this is the reader's full "is anyone looking?" picture: with the popover closed AND the item
+    /// hidden, nothing displays the data, so the reader stops reading until one of them turns back on.
+    /// AppDelegate.refreshLabels drives this off the "show<Item>Item" toggles.
+    func setItemVisible(_ visible: Bool)
+}
+
+extension MetricReader {
+    /// Default: the menu-bar item's visibility doesn't change this reader's cadence — used by a reader
+    /// whose glyph is static (Bluetooth), so its data is only ever needed while its popover is open.
+    func setItemVisible(_ visible: Bool) {}
 }
 
 extension BatteryReader: MetricReader {}

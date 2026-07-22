@@ -14,7 +14,11 @@ final class MemoryReader: ObservableObject {
     @Published var info = MemoryInfo()
 
     private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
+    // "Is anyone looking?" — the detail popover is open, or the RAM menu-bar item is visible. With
+    // neither, nothing shows the data, so the reader stops polling (see applyCadence). itemVisible
+    // defaults true to match AppDelegate's lenient "absent key ⇒ shown" default.
     private var panelOpen = false
+    private var itemVisible = true
 
     private static let idleInterval: TimeInterval = 2   // menu-bar % only
     private static let activeInterval: TimeInterval = 1 // live readout while the panel is open
@@ -28,18 +32,37 @@ final class MemoryReader: ObservableObject {
 
     init() {
         refresh()
-        poll.schedule(every: Self.idleInterval)
+        applyCadence()   // start the idle poll (item visible by default)
     }
 
-    /// Poll once a second while the panel is visible; drop back to the lazy menu-bar-only cadence
-    /// when it closes.
+    /// Poll fast while the panel is visible; drop to the lazy menu-bar-only cadence when it closes, or
+    /// stop entirely if the menu-bar item is also hidden (see applyCadence).
     func setPanelOpen(_ open: Bool) {
         panelOpen = open
-        poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
+        applyCadence()
         if open { refresh() }
     }
 
+    /// Driven by AppDelegate off the "showMemoryItem" toggle. When the item is hidden and the popover
+    /// is closed, nothing shows RAM — stop reading; when it's shown again, repaint now.
+    func setItemVisible(_ visible: Bool) {
+        guard visible != itemVisible else { return }
+        itemVisible = visible
+        applyCadence()
+        if visible && !panelOpen { refresh() }
+    }
+
+    /// Poll cadence from the two visibility signals: fast in the popover, lazy for the menu-bar glyph
+    /// alone, stopped when neither shows the data.
+    private func applyCadence() {
+        if panelOpen { poll.schedule(every: Self.activeInterval) }
+        else if itemVisible { poll.schedule(every: Self.idleInterval) }
+        else { poll.stop() }
+    }
+
     func refresh() {
+        // Nothing displays RAM when the popover is closed and the item is hidden — skip the read.
+        guard panelOpen || itemVisible else { return }
         guard var out = MemoryStats.read() else { return }
         out.pressure = Self.pressureLevel()
 
