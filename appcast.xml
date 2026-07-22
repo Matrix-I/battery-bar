@@ -7,6 +7,23 @@
     <language>en</language>
     <!-- APPCAST_ITEMS: update_appcast.sh prepends each release's <item> immediately below this line. -->
     <item>
+      <title>Version 2.7.0</title>
+      <pubDate>Wed, 22 Jul 2026 11:20:39 +0700</pubDate>
+      <sparkle:version>2.7.0</sparkle:version>
+      <sparkle:shortVersionString>2.7.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[# StatsBar v2.7.0
+
+More performance and reach.
+
+- **Network:** latency and reachability now work on IPv6-only connections. Previously the ping was IPv4-only, so an IPv6-only link showed the internet as unreachable with no latency even when it was fine.
+- **Lower idle usage:** iPhone/iPad and Android battery polling now backs off to a slow keep-warm when neither the popover nor the phone menu-bar item is showing — no more shelling out to libimobiledevice/adb every second for a phone nothing is watching. (Hot-battery alerts for a connected iPhone stay as responsive as before.)
+- **Under the hood:** the readers' background-read throttling is unified into one helper, and the SMC sensor reads skip a redundant syscall per key.
+
+_Not notarized — right-click → Open on first launch (or `xattr -dr com.apple.quarantine /Applications/StatsBar.app`)._]]></description>
+      <enclosure url="https://github.com/Matrix-I/stats-bar/releases/download/v2.7.0/StatsBar-v2.7.0.dmg" sparkle:edSignature="HSCnj+hTFlzmiTt5m8irkOGdKO2diRsKm1MoMBdiAPa8bxyjnHHJRuMQ6NgbXOZQszZVn9hPad+Po1EnmXXJCg==" length="2380855" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Version 2.6.0</title>
       <pubDate>Wed, 22 Jul 2026 10:52:14 +0700</pubDate>
       <sparkle:version>2.6.0</sparkle:version>
