@@ -104,6 +104,12 @@ final class CPUFrequency {
         return compute(delta: delta)
     }
 
+    /// Drop the baseline so the next sample() re-primes (returns nil) instead of diffing against a
+    /// stale sample. CPUReader stops sampling while the popover is closed, so without this the first
+    /// reading after a reopen would be the residency-weighted average over the whole closed interval
+    /// (possibly minutes) rather than the last second. Called from CPUReader.setPanelOpen(true).
+    func resetBaseline() { prevSample = nil }
+
     private func compute(delta: CFDictionary) -> Reading? {
         guard let iterate, let getName, let stateCount, let stateName, let stateResidency else { return nil }
 

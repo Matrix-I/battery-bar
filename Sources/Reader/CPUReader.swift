@@ -65,7 +65,12 @@ final class CPUReader: ObservableObject {
     func setPanelOpen(_ open: Bool) {
         panelOpen = open
         poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
-        if open { refresh() }
+        if open {
+            // Sampling paused while closed, so the baseline is stale — re-prime it so the first
+            // reading covers ~1s, not the whole time the popover was shut (see resetBaseline).
+            frequency.resetBaseline()
+            refresh()
+        }
     }
 
     func refresh() {

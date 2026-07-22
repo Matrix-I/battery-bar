@@ -15,6 +15,14 @@ final class IOSDeviceReader: ObservableObject {
     private var isBusy = false
     private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
 
+    /// Whether the previous enumeration found a device. Touched only inside the doRefresh call chain
+    /// (listDevices), which the isBusy guard serializes — one doRefresh finishes before the next
+    /// starts — so no locking is needed. Gates the retry burst below: it's worth it only when a
+    /// device was around last cycle (ride out a transient usbmux drop during a reconnect); when idle
+    /// it just wastes forks and sleeps re-confirming "still nothing". Starts true so a device present
+    /// at launch is still caught by the burst; self-adjusts after the first cycle.
+    private var sawDeviceLastCycle = true
+
     /// Warns (macOS notification) when a device's battery runs hot. Touched only on the main thread,
     /// inside publish, so its threshold-crossing state stays single-threaded.
     private let alerter = TemperatureAlerter()
@@ -76,16 +84,23 @@ final class IOSDeviceReader: ObservableObject {
     /// Wi-Fi" is on — so `-n` is enumerated too and those are read over the network transport. USB
     /// wins when a device is reachable both ways: it's faster and always live while plugged in.
     private func listDevices(_ path: String) -> [(udid: String, network: Bool)] {
-        for attempt in 0..<5 {
+        // Retry only when a device was present last cycle (ride out a reconnect blip); otherwise a
+        // single -l/-n pass. In steady-state idle the burst is pure waste — it never finds anything
+        // and the 1 Hz timer re-checks a second later, so a device appearing mid-idle is still picked
+        // up promptly without paying 5×(two forks + a 0.4s sleep) every cycle, forever.
+        let maxAttempts = sawDeviceLastCycle ? 5 : 1
+        for attempt in 0..<maxAttempts {
             let usb = listOne(path, "-l")
             let net = listOne(path, "-n")
             if !usb.isEmpty || !net.isEmpty {
+                sawDeviceLastCycle = true
                 var out = usb.sorted().map { (udid: $0, network: false) }
                 out += net.subtracting(usb).sorted().map { (udid: $0, network: true) }
                 return out
             }
-            if attempt < 4 { Thread.sleep(forTimeInterval: 0.4) }
+            if attempt < maxAttempts - 1 { Thread.sleep(forTimeInterval: 0.4) }
         }
+        sawDeviceLastCycle = false
         return []
     }
 

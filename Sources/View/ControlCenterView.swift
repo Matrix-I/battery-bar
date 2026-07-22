@@ -102,6 +102,12 @@ struct ControlCenterView: View {
 
     // MARK: Overview
 
+    /// The Bluetooth overview glyph is a fixed, state-independent rune (SF Symbols ships none), so
+    /// bake the template NSImage once instead of re-allocating it on every `overview` re-evaluation —
+    /// which happens several times per second while the popover is open, as all five observed readers
+    /// publish at ~1 Hz.
+    private static let bluetoothGlyph = bluetoothMenuBarImage()
+
     @ViewBuilder
     private var overview: some View {
         VStack(spacing: 6) {
@@ -122,7 +128,7 @@ struct ControlCenterView: View {
                         label: "Network", value: networkValue,
                         valueColor: .white) { openDetail(.network) }
 
-            OverviewRow(icon: .image(bluetoothMenuBarImage()),
+            OverviewRow(icon: .image(Self.bluetoothGlyph),
                         label: "Bluetooth", value: bluetoothValue,
                         valueColor: bluetoothReady ? .white : .secondary) { openDetail(.bluetooth) }
         }

@@ -44,7 +44,7 @@ struct BatteryDetailView: View {
     // sections (see iPhoneSection / androidSection) and measures the popover height — exactly like the
     // Mac toggles above.
     //
-    // iPhone uses @AppStorage, NOT @State, and that is the whole fix for the expand "giật": an @AppStorage
+    // Both use @AppStorage, NOT @State, and that is the whole fix for the expand "giật": an @AppStorage
     // write propagates back through UserDefaults on its own publish cycle, OUTSIDE the withAnimation
     // transaction, so SwiftUI resizes the popover in a single instant step (frame-analysis: 0 ramp frames,
     // identical to the Mac "Battery" toggle). A @State toggle animates the height over ~9 frames, and the
@@ -52,7 +52,7 @@ struct BatteryDetailView: View {
     // stutters during that ramp — overshooting and reversing for a frame. So the clean-looking Mac toggle
     // is clean precisely BECAUSE @AppStorage skips the animation; matching it here removes the jitter.
     @AppStorage("showIPhoneFullDetails") private var showIPhoneFullDetails = false
-    @State private var showAndroidFullDetails = false
+    @AppStorage("showAndroidFullDetails") private var showAndroidFullDetails = false
 
     // Read by TemperatureAlerter (same key, same default) to decide whether to warn on a hot iPhone.
     @AppStorage("alertHotIPhone") private var alertHotIPhone = true

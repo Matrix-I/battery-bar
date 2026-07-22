@@ -9,6 +9,7 @@ import IOKit
 final class BatteryReader: ObservableObject {
     @Published var info = BatteryInfo()
     private lazy var poll = PollingTimer { [weak self] in self?.refresh() }
+    private var panelOpen = false
     private let smc = SMC()
 
     // "Maximum Capacity" (macOS's own battery-health figure — System Information / Battery Health)
@@ -32,6 +33,7 @@ final class BatteryReader: ObservableObject {
 
     /// Poll once a second while the detail panel is visible; drop back to the lazy cadence when it closes.
     func setPanelOpen(_ open: Bool) {
+        panelOpen = open
         poll.schedule(every: open ? Self.activeInterval : Self.idleInterval)
         if open { refresh() }
     }
@@ -94,24 +96,28 @@ final class BatteryReader: ObservableObject {
             i.adapterPower = p.doubleValue
         }
 
-        // Live SMC power rails (these actually move every second — see the header note on BatteryInfo).
-        i.smcSystemTotalW  = smc.readFloat("PSTR")
-        i.smcDCInW         = smc.readFloat("PDTR")
-        i.smcBrightnessW   = smc.readFloat("PDBR")
-        i.smcThunderboltLW = smc.readFloat("PU1R")
-        i.smcThunderboltRW = smc.readFloat("PU2R")
-        i.smcPPBRW         = smc.readFloat("PPBR")
-
-        // Live fan speeds — same SMC user client, also ~1 Hz.
-        i.fans = smc.readFans()
+        // Live SMC power rails + fan speeds (these move every second — see the header note on
+        // BatteryInfo). They are detail-panel-only content, so skip the SMC user-client round-trips
+        // while the panel is closed — the menu-bar glyph needs only the IOKit charge fields read
+        // above. Matches the popover-gating every other reader does (cf. CPUReader's temperature read).
+        if panelOpen {
+            i.smcSystemTotalW  = smc.readFloat("PSTR")
+            i.smcDCInW         = smc.readFloat("PDTR")
+            i.smcBrightnessW   = smc.readFloat("PDBR")
+            i.smcThunderboltLW = smc.readFloat("PU1R")
+            i.smcThunderboltRW = smc.readFloat("PU2R")
+            i.smcPPBRW         = smc.readFloat("PPBR")
+            i.fans = smc.readFans()
+        }
 
         // macOS's own "Maximum Capacity" — refreshed at most every few minutes, off the main
         // thread (see the note on the cache fields above). Publish the last value we have.
         maybeReadMaximumCapacity()
         i.maximumCapacityPercent = cachedMaxCapacity
 
-        let snapshot = i
-        DispatchQueue.main.async { self.info = snapshot }
+        // refresh() only ever runs on the main thread (init / setPanelOpen / the main-run-loop poll),
+        // so publish directly rather than hopping to the next run-loop pass.
+        info = i
     }
 
     /// Refresh macOS's "Maximum Capacity" at most once every `healthInterval`, off the main thread.
