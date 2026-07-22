@@ -92,7 +92,6 @@ struct NetworkSection: View {
         SectionCaption("INTERFACE")
         VStack(spacing: 6) {
             InfoRow(label: "Interface", value: interfaceValue)
-            NetBadgeRow(label: "Status", up: info.isUp)
             if let mac = info.macAddress {
                 InfoRow(label: "Physical address", value: mac)
             }
