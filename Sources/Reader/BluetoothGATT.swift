@@ -58,7 +58,23 @@ final class BluetoothGATT: NSObject, CBCentralManagerDelegate, CBPeripheralDeleg
     // MARK: CBCentralManagerDelegate
 
     func centralManagerDidUpdateState(_ manager: CBCentralManager) {
-        if manager.state == .poweredOn { refresh() }
+        guard manager.state == .poweredOn else {
+            // Leaving .poweredOn (adapter switched off, reset, or deauthorised) invalidates every
+            // peripheral and its connection, but CoreBluetooth does NOT deliver a per-device
+            // didDisconnectPeripheral for that transition — so our retained CBPeripheral /
+            // CBCharacteristic objects silently go stale. Drop them all so the next .poweredOn takes
+            // the reconnect path in refresh() instead of re-reading a dead characteristic (which never
+            // calls back, freezing the level forever). Clear the published levels too, so a powered-off
+            // adapter shows no battery rather than a frozen last reading.
+            peripherals.removeAll()
+            batteryChars.removeAll()
+            if !levelsByName.isEmpty {
+                levelsByName.removeAll()
+                onUpdate?()
+            }
+            return
+        }
+        refresh()
     }
 
     func centralManager(_ manager: CBCentralManager, didConnect peripheral: CBPeripheral) {
