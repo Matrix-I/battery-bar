@@ -157,21 +157,7 @@ struct BatteryDetailView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showMacFullDetails.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(showMacFullDetails ? Color.white : Color.secondary)
-                            .padding(4)
-                            .background(
-                                Circle().fill(showMacFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help(showMacFullDetails ? "Show less" : "Show more")
+                    ShowMoreButton(isOn: $showMacFullDetails)
                 }
             }
 
@@ -233,21 +219,7 @@ struct BatteryDetailView: View {
             // battery-gauge values above (which the OS only refreshes every ~30–60 s).
             if i.smcSystemTotalW != nil || i.smcDCInW != nil {
                 SectionCaption("⚡ Power (live)") {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showMacPowerLiveDetails.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(showMacPowerLiveDetails ? Color.white : Color.secondary)
-                            .padding(4)
-                            .background(
-                                Circle().fill(showMacPowerLiveDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help(showMacPowerLiveDetails ? "Show less" : "Show more")
+                    ShowMoreButton(isOn: $showMacPowerLiveDetails)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     if let v = i.smcSystemTotalW { InfoRow(label: "System Total", value: String(format: "%.2f W", v)) }
@@ -301,21 +273,7 @@ struct BatteryDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionCaption("📱 iPhone / iPad (USB / Wi-Fi)") {
                 if device != nil {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showIPhoneFullDetails.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(showIPhoneFullDetails ? Color.white : Color.secondary)
-                            .padding(4)
-                            .background(
-                                Circle().fill(showIPhoneFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help(showIPhoneFullDetails ? "Show less" : "Show more")
+                    ShowMoreButton(isOn: $showIPhoneFullDetails)
                 }
             }
 
@@ -456,21 +414,7 @@ struct BatteryDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionCaption("🤖 Android (USB)") {
                 if hasDevices {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showAndroidFullDetails.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(showAndroidFullDetails ? Color.white : Color.secondary)
-                            .padding(4)
-                            .background(
-                                Circle().fill(showAndroidFullDetails ? Color.accentColor : Color.secondary.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help(showAndroidFullDetails ? "Show less" : "Show more")
+                    ShowMoreButton(isOn: $showAndroidFullDetails)
                 }
             }
 
@@ -571,5 +515,33 @@ struct BatteryDetailView: View {
         if i.externalConnected { return "Plugged in, not charging" }
         return (1..<65535).contains(i.timeToEmpty)
             ? "~\(fmtMinutes(i.timeToEmpty)) remaining" : "On battery"
+    }
+}
+
+/// The compact "slider.horizontal.3" pill that expands/collapses a section's detail rows. One shared
+/// definition for the Mac / Power / iPhone / Android sections so they stay visually identical — before
+/// this it was copy-pasted verbatim four times, differing only in the bound flag. `isOn` binds to the
+/// section's show-more @AppStorage flag; the withAnimation is kept here so every site animates the same
+/// way (the @AppStorage write still propagates on its own publish cycle, outside this transaction — see
+/// the note on showIPhoneFullDetails for why that matters to the resize animation).
+private struct ShowMoreButton: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isOn.toggle()
+            }
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(isOn ? Color.white : Color.secondary)
+                .padding(4)
+                .background(
+                    Circle().fill(isOn ? Color.accentColor : Color.secondary.opacity(0.15))
+                )
+        }
+        .buttonStyle(.plain)
+        .help(isOn ? "Show less" : "Show more")
     }
 }
