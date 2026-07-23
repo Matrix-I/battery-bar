@@ -204,7 +204,13 @@ final class CPUReader: ObservableObject {
         var count = natural_t(0)
         var infoArray: processor_info_array_t?
         var infoCount = mach_msg_type_number_t(0)
-        guard host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO,
+        // mach_host_self() returns an owned send right and bumps its user-reference count on every call
+        // (unlike the cached mach_task_self_), so it must be released or one uref leaks per poll — at the
+        // 2 s idle cadence that saturates MACH_PORT_UREFS_MAX within a couple of days and the query then
+        // starts failing. Release it whether or not host_processor_info succeeds. Mirrors MemoryStats.swift.
+        let host = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, host) }
+        guard host_processor_info(host, PROCESSOR_CPU_LOAD_INFO,
                                   &count, &infoArray, &infoCount) == KERN_SUCCESS,
               let infoArray else { return nil }
         defer {
