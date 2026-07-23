@@ -56,10 +56,10 @@ cat > "$APP.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleName</key>             <string>StatsBar</string>
     <key>CFBundleIconFile</key>         <string>AppIcon</string>
     <key>CFBundlePackageType</key>      <string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>2.9.0</string>
+    <key>CFBundleShortVersionString</key><string>2.9.1</string>
     <!-- Sparkle compares CFBundleVersion between the running app and the appcast to decide whether an
          update is newer, so it must be bumped alongside CFBundleShortVersionString on every release. -->
-    <key>CFBundleVersion</key>          <string>2.9.0</string>
+    <key>CFBundleVersion</key>          <string>2.9.1</string>
     <key>LSMinimumSystemVersion</key>   <string>13.0</string>
     <key>LSUIElement</key>              <true/>
     <!-- Sparkle auto-update. SUFeedURL is the appcast (kept in the repo, served raw from GitHub);
@@ -69,6 +69,12 @@ cat > "$APP.app/Contents/Info.plist" <<'PLIST'
     <string>https://raw.githubusercontent.com/Matrix-I/stats-bar/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>T9m2CL18FlN4xB3BR8rb6XNk7kFTCk4IWMIXlcp7WGE=</string>
+    <!-- How often Sparkle's background scheduler checks the appcast, in seconds: 6 hours. Sparkle's
+         built-in default is 1 day; this key sets the initial value (Sparkle enforces a 1-hour floor).
+         We never set updater.updateCheckInterval in code, so this Info.plist value governs on every
+         install — no user default shadows it. -->
+    <key>SUScheduledCheckInterval</key>
+    <integer>21600</integer>
     <!-- The Network item reads the Wi-Fi network name (SSID), which macOS 14+ only reveals to apps
          holding Location Services authorization. Both keys are provided so the prompt shows on old
          and new systems; nothing else in the app uses location. -->
