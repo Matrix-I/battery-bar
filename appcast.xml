@@ -7,6 +7,25 @@
     <language>en</language>
     <!-- APPCAST_ITEMS: update_appcast.sh prepends each release's <item> immediately below this line. -->
     <item>
+      <title>Version 2.10.0</title>
+      <pubDate>Thu, 23 Jul 2026 23:41:43 +0700</pubDate>
+      <sparkle:version>2.10.0</sparkle:version>
+      <sparkle:shortVersionString>2.10.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[# StatsBar v2.10.0 — Reliability fixes across CPU, Network, Bluetooth, and Android
+
+- **CPU usage no longer freezes on long uptimes:** fixed a Mach host-port leak in the CPU reader that, after a day or two of continuous running, could make the CPU readout stop updating until the app was restarted.
+- **Bluetooth accessory battery recovers after an off→on toggle:** the battery level of BLE accessories (e.g. a Logitech mouse) no longer sticks at its last value after you turn Bluetooth off and back on — it reconnects and resumes live updates.
+- **Menu-bar network rate clears on disconnect:** the throughput shown in the menu bar now drops to 0 when the connection goes away, instead of freezing at the last value while the popover already says "No active network connection".
+- **Intel Macs now show CPU temperature:** the classic Intel die-temperature sensors are decoded correctly (they were silently rejected before, leaving the reading blank).
+- **Android battery: faster reads and refresh on reconnect:** the learned battery capacity is re-read when you replug a phone, and the capacity read now filters on-device instead of transferring the multi-MB battery-history dump.
+- **Bluetooth device list refreshes at the intended rate:** it was updating roughly half as often as intended while the popover was open.
+- **Housekeeping:** de-duplicated popover components (CPU/Memory legends, the show-more toggles) and removed dead code.
+
+_Not notarized — right-click → Open on first launch (or `xattr -dr com.apple.quarantine /Applications/StatsBar.app`)._]]></description>
+      <enclosure url="https://github.com/Matrix-I/stats-bar/releases/download/v2.10.0/StatsBar-v2.10.0.dmg" sparkle:edSignature="zLVRpQ/xQgaK5xOvTqmoPdrlfz0qbOp537RVvpfOF9aRiQVqYluxnt8antMJYochwGIOTwpnlYsA8sP3pJcwDw==" length="2385135" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Version 2.9.1</title>
       <pubDate>Thu, 23 Jul 2026 22:40:18 +0700</pubDate>
       <sparkle:version>2.9.1</sparkle:version>
