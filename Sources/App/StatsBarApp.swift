@@ -46,12 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let popover: NSPopover
         let visibilityKey: String
         let glyph: (() -> (key: String, render: () -> NSImage)?)?
+        let actionTarget: ControlActionTarget
     }
 
-    /// A retained target for an NSControl's target/action that forwards to a Swift closure. NSControl
-    /// holds its `target` weakly, so instances must be kept alive by `buttonActions` — otherwise the
-    /// action would deallocate immediately and clicks would do nothing.
-    private final class ButtonAction: NSObject {
+    /// A retained target for an NSControl's target/action that forwards to a Swift closure.
+    private final class ControlActionTarget: NSObject {
         private let handler: () -> Void
         init(_ handler: @escaping () -> Void) { self.handler = handler }
         @objc func fire() { handler() }
@@ -61,7 +60,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// driven uniformly (toggle / presentDetail / refreshLabels) instead of one ivar + one @objc
     /// selector each. The Control Center is kept separate — it's never hidden and its glyph is static.
     private var metricItems: [StatMetric: MetricItem] = [:]
-    private var buttonActions: [ButtonAction] = []
 
     /// Last glyph cache key per metric, so refreshLabels rebuilds a status-item image only when its
     /// inputs actually change instead of every ~1 Hz tick. Main-thread only (refreshLabels runs on
@@ -70,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastGlyphKey: [StatMetric: String] = [:]
 
     private var controlCenterItem: NSStatusItem!
+    private var controlCenterActionTarget: ControlActionTarget?
     private let controlCenterPopover = NSPopover()
 
     private var allPopovers: [NSPopover] {
@@ -109,10 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                               self?.closeAll()
                                               self?.updater.checkForUpdates()
                                           }))
-        controlCenterItem = makeStatusItem(image: controlCenterMenuBarImage()) { [weak self] in
+        let (ccItem, ccTarget) = makeStatusItem(image: controlCenterMenuBarImage()) { [weak self] in
             guard let self else { return }
             self.toggle(self.controlCenterPopover, item: self.controlCenterItem)
         }
+        controlCenterItem = ccItem
+        controlCenterActionTarget = ccTarget
         controlCenterItem.button?.setAccessibilityLabel("Control Center")
 
         // The five toggleable metrics, in menu-bar order (StatMetric's declaration order). Each pairs
@@ -181,17 +182,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = host
     }
 
-    /// Creates a variable-length status item wired to `onClick` through a retained closure trampoline
-    /// (so items are built in a loop rather than one @objc selector each), optionally carrying a
-    /// static glyph for items whose image never changes.
-    private func makeStatusItem(image: NSImage? = nil, onClick: @escaping () -> Void) -> NSStatusItem {
+    /// Creates a variable-length status item wired to `onClick` through a retained closure target.
+    private func makeStatusItem(image: NSImage? = nil, onClick: @escaping () -> Void) -> (item: NSStatusItem, target: ControlActionTarget) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        let action = ButtonAction(onClick)
-        buttonActions.append(action)
-        item.button?.target = action
-        item.button?.action = #selector(ButtonAction.fire)
+        let target = ControlActionTarget(onClick)
+        item.button?.target = target
+        item.button?.action = #selector(ControlActionTarget.fire)
         if let image { item.button?.image = image }
-        return item
+        return (item, target)
     }
 
     /// Builds one toggleable metric's popover + status item and records it in `metricItems`.
@@ -200,9 +198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                        glyph: (() -> (key: String, render: () -> NSImage)?)? = nil) {
         let popover = NSPopover()
         configure(popover: popover, root: root)
-        let statusItem = makeStatusItem(image: staticImage) { [weak self] in self?.toggleMetric(metric) }
+        let (statusItem, target) = makeStatusItem(image: staticImage) { [weak self] in self?.toggleMetric(metric) }
         metricItems[metric] = MetricItem(statusItem: statusItem, popover: popover,
-                                         visibilityKey: key, glyph: glyph)
+                                         visibilityKey: key, glyph: glyph, actionTarget: target)
     }
 
     private func toggleMetric(_ metric: StatMetric) {
