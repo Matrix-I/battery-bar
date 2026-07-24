@@ -13,7 +13,7 @@ final class SMC {
     /// SMC on the machine, so opening one user client and reusing it — rather than one per reader —
     /// keeps a single IOServiceOpen handle and one shared KeyInfo cache. Safe as a singleton because
     /// every caller touches it only from the main thread (see keyInfoCache).
-    static let shared = SMC()
+    nonisolated(unsafe) static let shared = SMC()
 
     private var conn: io_connect_t = 0
     private(set) var isAvailable = false

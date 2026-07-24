@@ -53,9 +53,9 @@ final class AndroidDeviceReader: ObservableObject {
     /// history and take a while, so it's only fetched once per connected serial and cached — not
     /// worth re-running every second for numbers that barely change. Only touched from doRefresh(),
     /// which refresh()'s isBusy guard ensures never runs concurrently with itself.
-    private var capacityCache: [String: (max: Int?, design: Int?, cycle: Int?)] = [:]
-    private var capacityLastAttempt: [String: Date] = [:]
-    private var infoCache: [String: (name: String, manufacturer: String, version: String)] = [:]
+    nonisolated(unsafe) private var capacityCache: [String: (max: Int?, design: Int?, cycle: Int?)] = [:]
+    nonisolated(unsafe) private var capacityLastAttempt: [String: Date] = [:]
+    nonisolated(unsafe) private var infoCache: [String: (name: String, manufacturer: String, version: String)] = [:]
     nonisolated private static let capacityRetryInterval: TimeInterval = 30
 
     init() {
@@ -198,9 +198,11 @@ final class AndroidDeviceReader: ObservableObject {
         return n
     }
 
-    private func doRefresh() {
+    nonisolated private func doRefresh() {
         guard let adbPath = DeviceTool.path("adb") else {
-            publish(devices: [], toolsMissing: true, status: nil)
+            Task { @MainActor [weak self] in
+                self?.publish(devices: [], toolsMissing: true, status: nil)
+            }
             return
         }
 
@@ -216,8 +218,10 @@ final class AndroidDeviceReader: ObservableObject {
         infoCache = infoCache.filter { liveSerials.contains($0.key) }
 
         guard !listed.isEmpty else {
-            publish(devices: [], toolsMissing: false,
-                    status: "No Android device found over USB.\nPlug in the cable and enable USB debugging.")
+            Task { @MainActor [weak self] in
+                self?.publish(devices: [], toolsMissing: false,
+                        status: "No Android device found over USB.\nPlug in the cable and enable USB debugging.")
+            }
             return
         }
 
@@ -303,7 +307,9 @@ final class AndroidDeviceReader: ObservableObject {
             results.append(dev)
         }
 
-        publish(devices: results, toolsMissing: false, status: nil)
+        Task { @MainActor [weak self] in
+            self?.publish(devices: results, toolsMissing: false, status: nil)
+        }
     }
 
     private func publish(devices fresh: [AndroidDeviceInfo], toolsMissing: Bool, status: String?) {

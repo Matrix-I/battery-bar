@@ -27,7 +27,7 @@ enum MemoryStats {
         }
         guard kr == KERN_SUCCESS else { return nil }
 
-        let page = Double(vm_kernel_page_size)
+        let page = Double(getpagesize())
         var info = MemoryInfo()
         info.total = total
         info.wired = bytes(stats.wire_count, page)
