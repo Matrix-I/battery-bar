@@ -105,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.toggle(self.controlCenterPopover, item: self.controlCenterItem)
         }
+        controlCenterItem.button?.setAccessibilityLabel("Control Center")
 
         // The five toggleable metrics, in menu-bar order (StatMetric's declaration order). Each pairs
         // its reader-typed detail view with the glyph builder refreshLabels rebuilds each tick; the
@@ -265,7 +266,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // button nobody sees). A static-glyph item (glyph == nil, i.e. Bluetooth) had its image
             // set once at creation. Otherwise probe the cheap key and re-render + reassign only when
             // the inputs changed, so an unchanged value doesn't rebuild the image every second.
-            guard visible, let probe = m.glyph, let (key, render) = probe() else { continue }
+            guard visible else { continue }
+            switch metric {
+            case .battery:
+                let pct = Int(batteryReader.info.chargePercent.rounded())
+                m.statusItem.button?.setAccessibilityLabel("Battery \(pct)%\(batteryReader.info.isPluggedIn ? ", charging" : "")")
+            case .cpu:
+                let pct = Int(cpuReader.info.usagePercent.rounded())
+                m.statusItem.button?.setAccessibilityLabel("CPU \(pct)%")
+            case .memory:
+                let pct = Int(memoryReader.info.usagePercent.rounded())
+                m.statusItem.button?.setAccessibilityLabel("Memory \(pct)%")
+            case .network:
+                let up = menuBarRate(networkReader.info.uploadRate)
+                let down = menuBarRate(networkReader.info.downloadRate)
+                m.statusItem.button?.setAccessibilityLabel("Network up \(up), down \(down)")
+            case .bluetooth:
+                m.statusItem.button?.setAccessibilityLabel("Bluetooth")
+            }
+
+            guard let probe = m.glyph, let (key, render) = probe() else { continue }
             if lastGlyphKey[metric] != key {
                 m.statusItem.button?.image = render()
                 lastGlyphKey[metric] = key
