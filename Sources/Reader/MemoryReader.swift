@@ -10,6 +10,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class MemoryReader: ObservableObject {
     @Published var info = MemoryInfo()
 

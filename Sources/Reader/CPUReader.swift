@@ -19,6 +19,7 @@ import Foundation
 import Combine
 import AppKit
 
+@MainActor
 final class CPUReader: ObservableObject {
     @Published var info = CPUInfo()
 

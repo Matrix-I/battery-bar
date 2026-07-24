@@ -7,6 +7,7 @@ import Combine
 import IOKit
 import IOKit.ps
 
+@MainActor
 final class BatteryReader: ObservableObject {
     @Published var info = BatteryInfo()
     private lazy var poll = PollingTimer { [weak self] in self?.refresh() }

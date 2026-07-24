@@ -22,6 +22,7 @@ private func androidHealthText(_ code: Int?) -> String? {
     }
 }
 
+@MainActor
 final class AndroidDeviceReader: ObservableObject {
     @Published var devices: [AndroidDeviceInfo] = []
     @Published var toolsMissing = false

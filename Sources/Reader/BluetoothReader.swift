@@ -18,6 +18,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class BluetoothReader: ObservableObject {
     @Published var info = BluetoothInfo()
 

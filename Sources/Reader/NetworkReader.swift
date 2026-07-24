@@ -17,6 +17,7 @@ import Foundation
 import Combine
 import CoreLocation
 
+@MainActor
 final class NetworkReader: NSObject, ObservableObject {
     @Published var info = NetworkInfo()
     @Published var locationStatus: CLAuthorizationStatus = .notDetermined

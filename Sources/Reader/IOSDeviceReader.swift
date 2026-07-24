@@ -6,6 +6,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class IOSDeviceReader: ObservableObject {
     @Published var devices: [IOSDeviceInfo] = []
     @Published var toolsMissing = false
