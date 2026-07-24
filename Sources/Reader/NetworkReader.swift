@@ -267,7 +267,7 @@ final class NetworkReader: NSObject, ObservableObject {
                 let v6 = Pinger.ping(host: Self.pingHostV6)
                 if v6.reachable { result = v6 }
             }
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.info.latencyMs = result.latencyMs
                 self.info.jitterMs = result.jitterMs
@@ -291,7 +291,7 @@ final class NetworkReader: NSObject, ObservableObject {
         isFetchingPublicIP = true
         lastPublicIPAt = DispatchTime.now()
         PublicIP.fetch { [weak self] result in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.info.publicIPv4 = result.ipv4
                 self.info.publicIPv6 = result.ipv6
