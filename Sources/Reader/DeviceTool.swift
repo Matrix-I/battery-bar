@@ -60,6 +60,8 @@ enum DeviceTool {
 
         if group.wait(timeout: .now() + toolTimeout) == .timedOut {
             process.terminate()                          // SIGTERM
+            try? outPipe.fileHandleForReading.close()
+            try? errPipe.fileHandleForReading.close()
             if group.wait(timeout: .now() + 1) == .timedOut {
                 // The tool ignored SIGTERM (e.g. blocked in a usbmux syscall on a locked device).
                 // Escalate to SIGKILL so the child dies, its pipe write-ends close, and the two
