@@ -82,6 +82,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var labelPoll = PollingTimer { [weak self] in
         MainActor.assumeIsolated { self?.refreshLabels() }
     }
+    /// Cached preferences updated on NotificationCenter didChangeNotification, so 1 Hz refreshLabels
+    /// ticks read from fast in-memory fields rather than querying UserDefaults on every tick.
+    private var metricVisibility: [StatMetric: Bool] = [:]
+    private var showMenuBarPercent: Bool = true
+    private var showIPhoneMenuBar: Bool = false
+    private var showAndroidMenuBar: Bool = false
+    private var defaultsObserver: NSObjectProtocol?
+
     /// Fires on clicks outside the app so an open popover dismisses like a normal menu-bar popover.
     private var outsideClickMonitor: Any?
 
@@ -138,6 +146,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         addMetric(.bluetooth, key: "showBluetoothItem",
                   root: BluetoothDetailView(reader: bluetoothReader),
                   staticImage: bluetoothMenuBarImage())
+
+        updateSettingsCache()
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.updateSettingsCache()
+                self?.refreshLabels()
+            }
+        }
 
         refreshLabels()
         labelPoll.schedule(every: 1)
@@ -256,7 +276,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // to close.
         for metric in StatMetric.allCases {
             guard let m = metricItems[metric] else { continue }
-            let visible = UserDefaults.standard.object(forKey: m.visibilityKey) as? Bool ?? true
+            let visible = metricVisibility[metric] ?? true
             m.statusItem.isVisible = visible
             // Let the reader stop polling when its item is hidden (and its popover closed): with
             // nothing on screen there's no reason to keep reading. Idempotent — the reader no-ops when
@@ -293,16 +313,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func updateSettingsCache() {
+        let defaults = UserDefaults.standard
+        for metric in StatMetric.allCases {
+            if let key = metricItems[metric]?.visibilityKey {
+                metricVisibility[metric] = defaults.object(forKey: key) as? Bool ?? true
+            }
+        }
+        showMenuBarPercent = defaults.object(forKey: "showMenuBarPercent") as? Bool ?? true
+        showIPhoneMenuBar = defaults.bool(forKey: "showIPhoneMenuBar")
+        showAndroidMenuBar = defaults.bool(forKey: "showAndroidMenuBar")
+    }
+
     /// The battery status-item glyph, mirroring the old MenuBarLabel logic: a combined Mac+phone glyph
     /// when the iPhone/Android menu-bar toggle is on and a device is readable, otherwise the plain Mac
     /// battery. iPhone wins over Android when both are present, to keep the item from growing a third
     /// glyph. Returns a cache key over the visible inputs plus a render thunk, so refreshLabels
     /// rebuilds the image only when one of those inputs changes rather than every tick.
     private func batteryGlyph() -> (key: String, render: () -> NSImage) {
-        let defaults = UserDefaults.standard
-        let showPercent = defaults.object(forKey: "showMenuBarPercent") as? Bool ?? true
-        let showIPhone = defaults.bool(forKey: "showIPhoneMenuBar")
-        let showAndroid = defaults.bool(forKey: "showAndroidMenuBar")
+        let showPercent = showMenuBarPercent
+        let showIPhone = showIPhoneMenuBar
+        let showAndroid = showAndroidMenuBar
         let info = batteryReader.info
         let macPct = Int(info.chargePercent.rounded())
         let pct = showPercent ? 1 : 0
