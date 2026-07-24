@@ -55,6 +55,7 @@ final class AndroidDeviceReader: ObservableObject {
     /// which refresh()'s isBusy guard ensures never runs concurrently with itself.
     private var capacityCache: [String: (max: Int?, design: Int?, cycle: Int?)] = [:]
     private var capacityLastAttempt: [String: Date] = [:]
+    private var infoCache: [String: (name: String, manufacturer: String, version: String)] = [:]
     private static let capacityRetryInterval: TimeInterval = 30
 
     init() {
@@ -212,6 +213,7 @@ final class AndroidDeviceReader: ObservableObject {
         let liveSerials = Set(listed.map(\.serial))
         capacityCache = capacityCache.filter { liveSerials.contains($0.key) }
         capacityLastAttempt = capacityLastAttempt.filter { liveSerials.contains($0.key) }
+        infoCache = infoCache.filter { liveSerials.contains($0.key) }
 
         guard !listed.isEmpty else {
             publish(devices: [], toolsMissing: false,
@@ -232,9 +234,19 @@ final class AndroidDeviceReader: ObservableObject {
                 continue
             }
 
-            dev.name = getprop(adbPath, serial: entry.serial, key: "ro.product.model") ?? entry.serial
-            dev.manufacturer = getprop(adbPath, serial: entry.serial, key: "ro.product.manufacturer") ?? ""
-            dev.androidVersion = getprop(adbPath, serial: entry.serial, key: "ro.build.version.release") ?? ""
+            if let cached = infoCache[entry.serial] {
+                dev.name = cached.name
+                dev.manufacturer = cached.manufacturer
+                dev.androidVersion = cached.version
+            } else {
+                let name = getprop(adbPath, serial: entry.serial, key: "ro.product.model") ?? entry.serial
+                let manufacturer = getprop(adbPath, serial: entry.serial, key: "ro.product.manufacturer") ?? ""
+                let version = getprop(adbPath, serial: entry.serial, key: "ro.build.version.release") ?? ""
+                dev.name = name
+                dev.manufacturer = manufacturer
+                dev.androidVersion = version
+                infoCache[entry.serial] = (name, manufacturer, version)
+            }
 
             guard let bat = readBattery(adbPath, serial: entry.serial) else {
                 dev.errorMessage = "Couldn't read battery status — reconnect and unlock the phone."

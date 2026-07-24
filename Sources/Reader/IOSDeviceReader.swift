@@ -226,6 +226,15 @@ final class IOSDeviceReader: ObservableObject {
         return nil
     }
 
+    private func readDeviceInfoPlist(_ path: String, udid: String, network: Bool) -> (name: String, model: String, iosVersion: String)? {
+        guard let data = DeviceTool.run(path, transportArgs(network) + ["-u", udid, "-x"]),
+              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+              let name = plist["DeviceName"] as? String, !name.isEmpty else { return nil }
+        let model = (plist["ProductType"] as? String) ?? ""
+        let version = (plist["ProductVersion"] as? String) ?? ""
+        return (name, model, version)
+    }
+
     private func doRefresh(full: Bool) {
         guard let ideviceIdPath = DeviceTool.path("idevice_id"),
               let ideviceInfoPath = DeviceTool.path("ideviceinfo"),
@@ -283,6 +292,14 @@ final class IOSDeviceReader: ObservableObject {
                 dev.model = cached.model
                 dev.iosVersion = cached.iosVersion
                 trusted = true
+            } else if let batch = readDeviceInfoPlist(ideviceInfoPath, udid: udid, network: network) {
+                dev.name = batch.name
+                dev.model = batch.model
+                dev.iosVersion = batch.iosVersion
+                trusted = true
+                if !batch.model.isEmpty, !batch.iosVersion.isEmpty {
+                    infoCache[udid] = batch
+                }
             } else {
                 let named = infoValue(ideviceInfoPath, udid: udid, key: "DeviceName", network: network)
                 let model = infoValue(ideviceInfoPath, udid: udid, key: "ProductType", network: network) ?? ""
@@ -291,12 +308,6 @@ final class IOSDeviceReader: ObservableObject {
                 dev.model = model
                 dev.iosVersion = version
                 trusted = named != nil
-                // Cache only a COMPLETE identity: each field is a separate ideviceinfo fork+handshake,
-                // so DeviceName can succeed while ProductType/ProductVersion transiently stall on a
-                // flaky link. Caching those empties would pin a blank model/iOS version until unplug;
-                // requiring all three lets a partial read self-heal on the next tick (as the old
-                // per-tick read did). A trusted device always reports all three, so this keeps the
-                // optimization in practice and just falls back to per-tick reads otherwise.
                 if let named, !model.isEmpty, !version.isEmpty { infoCache[udid] = (named, model, version) }
             }
 
